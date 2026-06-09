@@ -1,0 +1,25 @@
+---
+description: Clean Architecture + Atomic Design boundaries for Contable Pro
+alwaysApply: true
+---
+
+# Regla 2 — Clean Architecture + Atomic Design
+
+## Dependencias (solo hacia adentro)
+`presentation → application → domain`. `infrastructure` implementa interfaces de `domain`.
+
+- La UI (páginas/componentes) **nunca** importa `@/lib/supabase`, `@supabase/*` ni `@/infrastructure/repositories/*` directamente para datos: usa **hooks** (`src/presentation/hooks`) que llaman **use-cases** (`@/infrastructure/di`).
+- El composition root es `src/infrastructure/di.ts`: ahí se instancian services con repositorios y se exponen use-cases.
+- `domain` no importa de `application`, `infrastructure` ni `presentation`.
+
+```ts
+// ❌ Mal: página hablando con Supabase
+import { supabase } from "@/lib/supabase";
+const { data } = await supabase.from("empresas").select("*");
+
+// ✅ Bien: página → hook → use-case
+const { data, loading, error } = useCompanies();
+```
+
+## Atomic Design
+`atoms → molecules → organisms → templates → pages`. Un componente solo importa de su nivel o inferior (un átomo nunca importa un organismo). Reutiliza la librería existente en `src/presentation/components`.

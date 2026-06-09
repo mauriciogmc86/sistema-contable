@@ -1,0 +1,21 @@
+---
+description: DRY and Clean Code standards for Contable Pro
+alwaysApply: true
+---
+
+# Regla 1 — DRY y Clean Code
+
+- No dupliques código. Antes de crear un componente/función, busca si ya existe en `src/presentation/components/{atoms,molecules,organisms}` o en `src/presentation/utils` y reutilízalo.
+- Funciones y archivos pequeños y enfocados (una responsabilidad). Si un componente/página supera ~150 líneas, extrae sub-componentes o hooks.
+- Nombres claros y en el idioma del dominio (es) para entidades contables; código/identificadores en inglés.
+- Sin comentarios narrativos que repitan el código. Comenta solo intención no obvia, trade-offs o restricciones.
+- Manejo de errores explícito: nada de `catch {}` vacío. Usa estados `loading/empty/error` (`EmptyState`, `ErrorState`, skeletons).
+- Centraliza: formato en `presentation/utils/format.ts`, validación en `application/validation`, clases con `cn`.
+
+```tsx
+// ❌ Mal: estilos inline duplicados y sin estado de error
+<div style={{ padding: 32, background: "#0f172a" }}>{data.map(...)}</div>
+
+// ✅ Bien: componentes reutilizables + estados
+{error ? <ErrorState onRetry={reload} /> : <DataTable columns={cols} data={rows} loading={loading} />}
+```

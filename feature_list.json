@@ -1,0 +1,37 @@
+{
+  "$schema": "https://contable-pro/feature-list.schema.json",
+  "features": [
+    {
+      "id": "F-001",
+      "title": "Conectar módulo contable (cuentas/asientos) a Supabase tras interfaces de repositorio",
+      "acceptance": [
+        "Crear SupabaseAccountRepository y SupabaseJournalEntryRepository que implementen las interfaces de domain",
+        "Cablearlos en src/infrastructure/di.ts sin cambiar la firma de los use-cases",
+        "Las páginas siguen consumiendo solo hooks/use-cases (sin Supabase directo)",
+        "typecheck + lint + build en verde"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "F-002",
+      "title": "Edición de empresas y trabajadores (update) con formularios prellenados",
+      "acceptance": [
+        "Reutilizar EmpresaForm con modo edición (valores iniciales)",
+        "Mutaciones vía repositorio de infraestructura + recarga de la lista",
+        "Validación Zod centralizada (empresaSchema/trabajadorSchema)",
+        "Estados loading/empty/error y a11y en errores"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "F-003",
+      "title": "Pruebas unitarias de validación y formato",
+      "acceptance": [
+        "Tests para rifSchema, cedulaSchema, asientoSchema (balance) y formatCurrency es-VE",
+        "Runner configurado (vitest) y script de test",
+        "./init.sh ejecuta los tests en verde"
+      ],
+      "status": "pending"
+    }
+  ]
+}

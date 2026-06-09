@@ -1,0 +1,16 @@
+---
+description: Confirm before taking non-requested or destructive actions
+alwaysApply: true
+---
+
+# Regla 3 — Confirmar antes de actuar
+
+- No hagas nada que no se haya pedido. Mantente dentro del alcance de la tarea.
+- Ante decisiones con impacto, **detente y confirma primero** con una pregunta concreta (usa opciones cuando sea posible):
+  - Instalar/eliminar dependencias.
+  - Borrar o mover archivos/carpetas.
+  - Cambiar contratos públicos (interfaces de `domain`, firmas de use-cases) o rutas.
+  - Refactors amplios o cambios de arquitectura.
+  - Migraciones de datos / cambios en Supabase (tablas, RLS).
+- Para decisiones menores y reversibles (nombres, formato, valores por defecto equivalentes), elige una opción razonable y continúa.
+- Nunca expongas secretos ni hardcodees credenciales: usa `process.env.NEXT_PUBLIC_SUPABASE_*`.

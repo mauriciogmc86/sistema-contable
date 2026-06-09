@@ -1,0 +1,264 @@
+@import "tailwindcss";
+
+/* Class-based dark mode (driven by ThemeProvider + useThemeStore) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ----------------------------------------------------------------------------
+   Design tokens — semantic variables. Light is the default; .dark overrides.
+   Palette: navy/slate foundation + indigo primary + gold accent (banking/fintech).
+---------------------------------------------------------------------------- */
+:root {
+  --background: #f1f5f9;
+  --foreground: #0f172a;
+
+  --surface: #ffffff;
+  --surface-foreground: #0f172a;
+  --surface-muted: #f8fafc;
+
+  --muted: #f1f5f9;
+  --muted-foreground: #475569;
+
+  --border: #e2e8f0;
+  --input: #ffffff;
+  --ring: #6366f1;
+
+  --primary: #4f46e5;
+  --primary-foreground: #ffffff;
+  --primary-hover: #4338ca;
+
+  --accent: #ca8a04;
+  --accent-foreground: #ffffff;
+
+  --success: #059669;
+  --success-foreground: #ffffff;
+  --success-subtle: #ecfdf5;
+
+  --danger: #dc2626;
+  --danger-foreground: #ffffff;
+  --danger-subtle: #fef2f2;
+
+  --warning: #d97706;
+  --warning-foreground: #ffffff;
+  --warning-subtle: #fffbeb;
+
+  --info: #2563eb;
+  --info-foreground: #ffffff;
+  --info-subtle: #eff6ff;
+
+  --shadow-color: 220 40% 20%;
+}
+
+.dark {
+  --background: #020617;
+  --foreground: #f8fafc;
+
+  --surface: #0f172a;
+  --surface-foreground: #f8fafc;
+  --surface-muted: #111c33;
+
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+
+  --border: #1e293b;
+  --input: #0b1220;
+  --ring: #818cf8;
+
+  --primary: #6366f1;
+  --primary-foreground: #ffffff;
+  --primary-hover: #818cf8;
+
+  --accent: #eab308;
+  --accent-foreground: #1c1917;
+
+  --success: #10b981;
+  --success-foreground: #022c22;
+  --success-subtle: #052e23;
+
+  --danger: #f87171;
+  --danger-foreground: #450a0a;
+  --danger-subtle: #2a1212;
+
+  --warning: #fbbf24;
+  --warning-foreground: #422006;
+  --warning-subtle: #2a1d05;
+
+  --info: #60a5fa;
+  --info-foreground: #0a1f3d;
+  --info-subtle: #0c1f3a;
+
+  --shadow-color: 220 60% 2%;
+}
+
+/* ----------------------------------------------------------------------------
+   Map tokens to Tailwind theme so utilities like bg-primary, text-muted-foreground,
+   border-border, ring-ring, bg-surface, font-sans, rounded-card are generated.
+---------------------------------------------------------------------------- */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-surface: var(--surface);
+  --color-surface-foreground: var(--surface-foreground);
+  --color-surface-muted: var(--surface-muted);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-subtle: var(--success-subtle);
+
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-subtle: var(--danger-subtle);
+
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-subtle: var(--warning-subtle);
+
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-subtle: var(--info-subtle);
+
+  --font-sans: var(--font-ibm-plex-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+
+  --radius-card: 0.875rem;
+}
+
+/* ----------------------------------------------------------------------------
+   Base layer — token-driven, no !important so components keep full control.
+---------------------------------------------------------------------------- */
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: color-mix(in srgb, var(--color-primary) 28%, transparent);
+  }
+
+  *:focus-visible {
+    outline: 2px solid transparent;
+    box-shadow: 0 0 0 2px var(--color-background), 0 0 0 4px var(--color-ring);
+    border-radius: 0.375rem;
+  }
+}
+
+/* Respect reduced motion preferences globally */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Themed scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--color-border);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* ----------------------------------------------------------------------------
+   Premium visual layer — reusable decorative utilities.
+---------------------------------------------------------------------------- */
+
+/* Aurora / mesh gradient backdrop (brand panels, hero) */
+.bg-aurora {
+  background-color: #060b1a;
+  background-image:
+    radial-gradient(60rem 60rem at 12% -10%, color-mix(in srgb, var(--color-primary) 55%, transparent), transparent 60%),
+    radial-gradient(48rem 48rem at 110% 10%, color-mix(in srgb, var(--color-accent) 38%, transparent), transparent 55%),
+    radial-gradient(50rem 50rem at 50% 120%, color-mix(in srgb, #6d28d9 45%, transparent), transparent 60%);
+}
+
+/* Subtle grid overlay */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, currentColor 8%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, currentColor 8%, transparent) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+/* Dotted overlay */
+.bg-dots {
+  background-image: radial-gradient(color-mix(in srgb, currentColor 14%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* Gradient brand text */
+.text-gradient {
+  background: linear-gradient(100deg, var(--color-primary), color-mix(in srgb, var(--color-accent) 85%, var(--color-primary)));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Premium layered shadow + hairline ring */
+.shadow-premium {
+  box-shadow:
+    0 1px 0 0 color-mix(in srgb, #ffffff 6%, transparent) inset,
+    0 1px 2px hsl(var(--shadow-color) / 0.18),
+    0 12px 32px -12px hsl(var(--shadow-color) / 0.35);
+}
+
+/* Glass surface that stays legible in light + dark */
+.glass {
+  background-color: color-mix(in srgb, var(--color-surface) 72%, transparent);
+  backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
+}
+
+/* Card with a faint gradient sheen */
+.card-sheen {
+  background-image: linear-gradient(160deg, color-mix(in srgb, var(--color-primary) 5%, transparent), transparent 38%);
+}
+
+/* Soft radial glow accent */
+.glow-primary {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 30%, transparent),
+    0 18px 50px -18px color-mix(in srgb, var(--color-primary) 60%, transparent);
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.animate-float-slow { animation: float-slow 7s ease-in-out infinite; }
