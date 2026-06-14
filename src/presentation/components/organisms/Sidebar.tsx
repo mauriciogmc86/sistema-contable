@@ -23,14 +23,14 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
     <>
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-sm md:hidden"
+          className="no-print fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-sm md:hidden"
           onClick={onClose}
           aria-hidden
         />
       )}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-surface transition-transform duration-200 md:translate-x-0",
+          "no-print fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-surface transition-transform duration-200 md:translate-x-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
         aria-label="Navegación principal"
@@ -98,14 +98,16 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
           <div className="bg-aurora relative overflow-hidden rounded-xl p-4 text-white">
             <div className="bg-dots absolute inset-0 text-white/60" aria-hidden />
             <div className="relative">
-              <p className="text-sm font-semibold">Soporte premium</p>
-              <p className="mt-1 text-xs text-white/70">Asesoría contable y respuesta prioritaria 24/7.</p>
-              <button
-                type="button"
-                className="mt-3 w-full cursor-pointer rounded-lg bg-white/15 py-1.5 text-xs font-semibold text-white backdrop-blur transition-colors hover:bg-white/25"
+              <p className="text-sm font-semibold">Portolio</p>
+              <p className="mt-1 text-xs text-white/70">Mauricio Muñoz — soporte y asesoría tecnológica.</p>
+              <a
+                href="https://wa.link/3k910z"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 block w-full cursor-pointer rounded-lg bg-white/15 py-1.5 text-center text-xs font-semibold text-white backdrop-blur transition-colors hover:bg-white/25"
               >
                 Contactar soporte
-              </button>
+              </a>
             </div>
           </div>
         </div>

@@ -28,6 +28,7 @@ export interface EmpresaLegalRow {
   fecha_constitucion?: string;
   numero_registro?: string;
   tomo_numero?: string;
+  logo_url?: string | null;
   representantes?: RepresentanteRow[];
 }
 

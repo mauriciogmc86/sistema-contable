@@ -1,4 +1,5 @@
 import { Account, Company, JournalEntry } from '../entities';
+export type { IPurchaseBookRepository, PurchaseBookFilters } from './IPurchaseBookRepository';
 
 export interface ICompanyRepository {
   findAll(): Promise<Company[]>;

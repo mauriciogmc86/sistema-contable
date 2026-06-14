@@ -1,5 +1,6 @@
 import {
   Document,
+  ImageRun,
   Packer,
   Paragraph,
   TextRun,
@@ -41,8 +42,24 @@ function para(runs: TextRun[], opts?: { center?: boolean; bold?: boolean }): Par
   });
 }
 
+async function loadLogoImage(url: string): Promise<{ data: Uint8Array; type: "png" | "jpg" | "gif" | "bmp" } | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const buffer = new Uint8Array(await blob.arrayBuffer());
+    const mime = blob.type;
+    if (mime === "image/jpeg") return { data: buffer, type: "jpg" };
+    if (mime === "image/gif") return { data: buffer, type: "gif" };
+    if (mime === "image/bmp") return { data: buffer, type: "bmp" };
+    return { data: buffer, type: "png" };
+  } catch {
+    return null;
+  }
+}
+
 /** Build the full contract text as a docx Document */
-function buildDocument(data: ContractData): Document {
+async function buildDocument(data: ContractData): Promise<Document> {
   const { empleado, empresa } = data;
   const rep = empresa?.representantes?.[0];
 
@@ -147,8 +164,25 @@ function buildDocument(data: ContractData): Document {
     ],
   });
 
+  const logoSections: Paragraph[] = [];
+  const logo = empresa?.logo_url ? await loadLogoImage(empresa.logo_url) : null;
+  if (logo) {
+    logoSections.push(
+      new Paragraph({
+        children: [
+          new ImageRun({
+            type: logo.type,
+            data: logo.data,
+            transformation: { width: 140, height: 70 },
+          }),
+        ],
+        spacing: { after: 200 },
+      }),
+    );
+  }
+
   const sections: Paragraph[] = [
-    // Title
+    ...logoSections,
     new Paragraph({
       children: [
         bold("CONTRATO DE TRABAJO POR TIEMPO DETERMINADO\n"),
@@ -159,7 +193,6 @@ function buildDocument(data: ContractData): Document {
       spacing: { after: 280 },
     }),
 
-    // Intro
     para([
       normal("Entre la Sociedad Mercantil, "),
       bold(empresa?.nombre || BLANK),
@@ -387,7 +420,7 @@ function buildDocument(data: ContractData): Document {
 }
 
 export async function exportToDocx(data: ContractData, filename: string): Promise<void> {
-  const doc = buildDocument(data);
+  const doc = await buildDocument(data);
   const blob = await Packer.toBlob(doc);
   saveAs(blob, filename);
 }

@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { Download, FileText, Printer, Search } from "lucide-react";
-import { cedulaSchema } from "@/application/validation";
+import { cedulaDigitsSchema } from "@/application/validation";
 import { getContractByCedula, type ContractData } from "@/infrastructure/repositories/SupabaseLegalRepository";
 import { exportToDocx, exportToPdf } from "@/lib/contractExport";
 import { Button } from "@/presentation/components/atoms/Button";
-import { Input } from "@/presentation/components/atoms/Input";
 import { Card, CardContent } from "@/presentation/components/molecules/Card";
+import { PrefixedCedulaInput } from "@/presentation/components/molecules/PrefixedCedulaInput";
 import { EmptyState } from "@/presentation/components/molecules/EmptyState";
 import { PageHeader } from "@/presentation/components/organisms/PageHeader";
 import { ContractPreview } from "@/presentation/components/organisms/ContractPreview";
@@ -23,7 +23,7 @@ export default function LegalPage() {
     e.preventDefault();
     setError(null);
     setResult(null);
-    const parsed = cedulaSchema.safeParse(cedula);
+    const parsed = cedulaDigitsSchema.safeParse(cedula);
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Cédula inválida");
       return;
@@ -91,11 +91,10 @@ export default function LegalPage() {
                 <label htmlFor="cedula" className="mb-1.5 block text-sm font-medium text-foreground">
                   Cédula del trabajador
                 </label>
-                <Input
+                <PrefixedCedulaInput
                   id="cedula"
                   value={cedula}
-                  onChange={(e) => setCedula(e.target.value)}
-                  placeholder="V-12345678"
+                  onChange={setCedula}
                   invalid={Boolean(error)}
                   aria-describedby={error ? "cedula-error" : undefined}
                 />

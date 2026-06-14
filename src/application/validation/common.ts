@@ -1,18 +1,64 @@
 import { z } from "zod";
+import { formatCedula, formatRif, parseRifInput, stripCedulaPrefix } from "@/lib/venezuelanId";
 
-/** Venezuelan RIF: letter (V,E,J,P,G,R,C) + 8 digits + 1 check digit. */
+/** Venezuelan RIF completo (normalizado). */
 export const rifSchema = z
   .string()
   .trim()
   .toUpperCase()
   .regex(/^[VEJPGRC]-?\d{8}-?\d$/, "RIF inválido. Formato esperado: J-12345678-9");
 
-/** Venezuelan cédula: V/E + 6 to 8 digits. */
+/** Venezuelan cédula completa (normalizada). */
 export const cedulaSchema = z
   .string()
   .trim()
   .toUpperCase()
   .regex(/^[VE]-?\d{6,8}$/, "Cédula inválida. Formato esperado: V-12345678");
+
+/** Solo dígitos de cédula → normaliza a V-XXXXXXXX al validar. */
+export const cedulaDigitsSchema = z
+  .string()
+  .trim()
+  .min(1, "La cédula es requerida")
+  .superRefine((val, ctx) => {
+    const digits = stripCedulaPrefix(val);
+    if (!/^\d{6,8}$/.test(digits)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Ingresa entre 6 y 8 dígitos" });
+    }
+  })
+  .transform((val) => formatCedula(stripCedulaPrefix(val)));
+
+/** Cédula opcional (representante legal). */
+export const optionalCedulaDigitsSchema = z
+  .string()
+  .trim()
+  .superRefine((val, ctx) => {
+    if (val === "") return;
+    const digits = stripCedulaPrefix(val);
+    if (!/^\d{6,8}$/.test(digits)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Ingresa entre 6 y 8 dígitos" });
+    }
+  })
+  .transform((val) => (val === "" ? "" : formatCedula(stripCedulaPrefix(val))));
+
+/** Solo dígitos de RIF (8 + verificador) → normaliza a J-XXXXXXXX-X al validar. */
+export const rifDigitsSchema = z
+  .string()
+  .trim()
+  .min(1, "El RIF es requerido")
+  .superRefine((val, ctx) => {
+    const { body, check } = parseRifInput(val);
+    if (!/^\d{9}$/.test(`${body}${check}`)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Ingresa 9 dígitos (incluye el verificador)",
+      });
+    }
+  })
+  .transform((val) => {
+    const { body, check } = parseRifInput(val);
+    return formatRif(body, check);
+  });
 
 export const emailSchema = z
   .string()

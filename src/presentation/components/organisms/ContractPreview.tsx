@@ -76,11 +76,22 @@ export function ContractPreview({ data }: ContractPreviewProps) {
   return (
     <>
       <div id="printable-contract" className="printable-contract">
-        {/* ── TÍTULO ── */}
-        <div className="contract-title">
-          CONTRATO DE TRABAJO POR TIEMPO DETERMINADO
-          <br />
-          LOTTT GACETA OFICIAL EXT 6.076 DEL 7-05-2012 ART 62
+        <div className="contract-content">
+        {/* ── LOGO + TÍTULO ── */}
+        <div className="contract-header">
+          {empresa?.logo_url && (
+            <img
+              src={empresa.logo_url}
+              alt={`Logo ${empresa.nombre ?? "empresa"}`}
+              className="contract-logo"
+              crossOrigin="anonymous"
+            />
+          )}
+          <div className="contract-title">
+            CONTRATO DE TRABAJO POR TIEMPO DETERMINADO
+            <br />
+            LOTTT GACETA OFICIAL EXT 6.076 DEL 7-05-2012 ART 62
+          </div>
         </div>
 
         {/* ── CUERPO: todo el texto en un solo bloque continuo ── */}
@@ -321,10 +332,12 @@ export function ContractPreview({ data }: ContractPreviewProps) {
             </tbody>
           </table>
         </div>
+        </div>
       </div>
 
       <style jsx global>{`
         .printable-contract {
+          position: relative;
           background: white;
           color: black;
           padding: 48px 56px;
@@ -335,10 +348,31 @@ export function ContractPreview({ data }: ContractPreviewProps) {
           font-size: 13.5px;
           line-height: 1.5;
         }
+        .contract-content {
+          position: relative;
+          z-index: 1;
+        }
+        .contract-header {
+          position: relative;
+          min-height: 72px;
+          margin-bottom: 16px;
+        }
+        .contract-logo {
+          position: absolute;
+          top: 0;
+          left: 0;
+          max-height: 72px;
+          max-width: 180px;
+          object-fit: contain;
+          z-index: 2;
+          opacity: 0.45;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
         .contract-title {
           text-align: center;
           font-weight: bold;
-          margin-bottom: 10px;
+          padding-top: 8px;
           font-size: 14px;
           text-transform: uppercase;
           letter-spacing: 0.02em;
@@ -397,6 +431,9 @@ export function ContractPreview({ data }: ContractPreviewProps) {
             max-width: 100%;
             border-radius: 0;
             font-size: 12pt;
+          }
+          .contract-logo {
+            opacity: 0.45;
           }
           body {
             background: white !important;

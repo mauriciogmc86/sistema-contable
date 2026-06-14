@@ -9,23 +9,28 @@
 import { AccountService } from "@/application/services/AccountService";
 import { CompanyService } from "@/application/services/CompanyService";
 import { JournalEntryService } from "@/application/services/JournalEntryService";
+import { PurchaseBookService } from "@/application/services/PurchaseBookService";
 import { buildGetAccountUseCases } from "@/application/use-cases/AccountUseCases";
 import { buildCompanyUseCases } from "@/application/use-cases/CompanyUseCases";
 import { buildDashboardMetrics, type DashboardMetrics } from "@/application/use-cases/DashboardUseCases";
 import { buildJournalEntryUseCases } from "@/application/use-cases/JournalEntryUseCases";
+import { buildPurchaseBookUseCases } from "@/application/use-cases/PurchaseBookUseCases";
 import {
   mockAccountRepository,
   mockJournalEntryRepository,
+  mockPurchaseBookRepository,
 } from "@/infrastructure/repositories";
 import { supabaseCompanyRepository } from "@/infrastructure/repositories/SupabaseCompanyRepository";
 
 const companyService = new CompanyService(supabaseCompanyRepository);
 const accountService = new AccountService(mockAccountRepository);
 const journalEntryService = new JournalEntryService(mockJournalEntryRepository);
+const purchaseBookService = new PurchaseBookService(mockPurchaseBookRepository);
 
 export const companyUseCases = buildCompanyUseCases(companyService);
 export const accountUseCases = buildGetAccountUseCases(accountService);
 export const journalEntryUseCases = buildJournalEntryUseCases(journalEntryService);
+export const purchaseBookUseCases = buildPurchaseBookUseCases(purchaseBookService);
 
 export function getDashboardMetrics(companyId?: string): Promise<DashboardMetrics> {
   return buildDashboardMetrics(journalEntryService, companyId)();

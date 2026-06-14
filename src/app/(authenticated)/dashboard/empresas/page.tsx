@@ -1,15 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, Plus, Trash2, Users } from "lucide-react";
+import dynamic from "next/dynamic";
+import { Building2, Pencil, Plus, Trash2, Users } from "lucide-react";
 import type { EmpresaInput, TrabajadorInput } from "@/application/validation";
 import {
   createEmpresa,
   createTrabajador,
   deleteEmpresa,
   deleteTrabajador,
+  getEmpresa,
+  getTrabajador,
   listEmpresas,
   listTrabajadores,
+  updateEmpresa,
+  updateTrabajador,
   type EmpresaRecord,
   type TrabajadorRecord,
 } from "@/infrastructure/repositories/SupabaseEmpresaRepository";
@@ -19,17 +24,26 @@ import { Card, CardContent } from "@/presentation/components/molecules/Card";
 import { ConfirmDialog } from "@/presentation/components/molecules/ConfirmDialog";
 import { EmptyState } from "@/presentation/components/molecules/EmptyState";
 import { ErrorState } from "@/presentation/components/molecules/ErrorState";
+import { SaveSuccessModal, type SaveSuccessKind } from "@/presentation/components/molecules/SaveSuccessModal";
 import { SearchInput } from "@/presentation/components/molecules/SearchInput";
 import { TableSkeleton } from "@/presentation/components/molecules/Skeleton";
-import { EmpresaForm } from "@/presentation/components/organisms/EmpresaForm";
 import { Modal } from "@/presentation/components/organisms/Modal";
 import { PageHeader } from "@/presentation/components/organisms/PageHeader";
-import { TrabajadorForm } from "@/presentation/components/organisms/TrabajadorForm";
 import { useAsync } from "@/presentation/hooks";
 import { useCompanyStore } from "@/presentation/store/useCompanyStore";
 import { formatCurrency } from "@/presentation/utils/format";
 import { useCurrencyStore } from "@/presentation/store/useCurrencyStore";
 import { cn } from "@/presentation/utils/cn";
+
+const EmpresaForm = dynamic(
+  () => import("@/presentation/components/organisms/EmpresaForm").then((m) => m.EmpresaForm),
+  { ssr: false },
+);
+
+const TrabajadorForm = dynamic(
+  () => import("@/presentation/components/organisms/TrabajadorForm").then((m) => m.TrabajadorForm),
+  { ssr: false },
+);
 
 export default function EmpresasPage() {
   const [tab, setTab] = useState<"mercantil" | "personal">("mercantil");
@@ -46,8 +60,12 @@ export default function EmpresasPage() {
 
   const [empresaModalOpen, setEmpresaModalOpen] = useState(false);
   const [trabajadorModalOpen, setTrabajadorModalOpen] = useState(false);
+  const [empresaEdit, setEmpresaEdit] = useState<{ id: string; values: EmpresaInput } | null>(null);
+  const [trabajadorEdit, setTrabajadorEdit] = useState<{ id: string; values: TrabajadorInput } | null>(null);
   const [empresaToDelete, setEmpresaToDelete] = useState<EmpresaRecord | null>(null);
   const [trabajadorToDelete, setTrabajadorToDelete] = useState<TrabajadorRecord | null>(null);
+  const [editLoading, setEditLoading] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<SaveSuccessKind | null>(null);
 
   const filtered = (empresas.data ?? []).filter(
     (e) =>
@@ -56,18 +74,62 @@ export default function EmpresasPage() {
       e.rif?.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const handleCreateEmpresa = async (data: EmpresaInput) => {
-    await createEmpresa(data);
+  const handleCreateEmpresa = async (data: EmpresaInput, logoFile?: File | null) => {
+    if (empresaEdit) {
+      await updateEmpresa(empresaEdit.id, data, logoFile);
+    } else {
+      await createEmpresa(data, logoFile);
+    }
     empresas.reload();
     loadCompanies();
     setEmpresaModalOpen(false);
+    setEmpresaEdit(null);
+    setSaveSuccess(empresaEdit ? "empresa-updated" : "empresa-created");
   };
 
   const handleCreateTrabajador = async (data: TrabajadorInput) => {
     if (!activeCompanyId) return;
-    await createTrabajador(activeCompanyId, data);
+    if (trabajadorEdit) {
+      await updateTrabajador(trabajadorEdit.id, data);
+    } else {
+      await createTrabajador(activeCompanyId, data);
+    }
     trabajadores.reload();
     setTrabajadorModalOpen(false);
+    setTrabajadorEdit(null);
+    setSaveSuccess(trabajadorEdit ? "trabajador-updated" : "trabajador-created");
+  };
+
+  const openNewEmpresa = () => {
+    setEmpresaEdit(null);
+    setEmpresaModalOpen(true);
+  };
+
+  const openEditEmpresa = async (empresa: EmpresaRecord) => {
+    setEditLoading(empresa.id);
+    try {
+      const values = await getEmpresa(empresa.id);
+      setEmpresaEdit({ id: empresa.id, values });
+      setEmpresaModalOpen(true);
+    } finally {
+      setEditLoading(null);
+    }
+  };
+
+  const openNewTrabajador = () => {
+    setTrabajadorEdit(null);
+    setTrabajadorModalOpen(true);
+  };
+
+  const openEditTrabajador = async (trabajador: TrabajadorRecord) => {
+    setEditLoading(trabajador.id);
+    try {
+      const values = await getTrabajador(trabajador.id);
+      setTrabajadorEdit({ id: trabajador.id, values });
+      setTrabajadorModalOpen(true);
+    } finally {
+      setEditLoading(null);
+    }
   };
 
   return (
@@ -101,7 +163,7 @@ export default function EmpresasPage() {
             <div className="max-w-sm flex-1">
               <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre o RIF..." />
             </div>
-            <Button leftIcon={<Plus className="h-4 w-4" aria-hidden />} onClick={() => setEmpresaModalOpen(true)}>
+            <Button leftIcon={<Plus className="h-4 w-4" aria-hidden />} onClick={openNewEmpresa}>
               Nueva empresa
             </Button>
           </div>
@@ -120,7 +182,7 @@ export default function EmpresasPage() {
               title="Sin empresas"
               description="Registra tu primera empresa."
               action={
-                <Button size="sm" leftIcon={<Plus className="h-4 w-4" aria-hidden />} onClick={() => setEmpresaModalOpen(true)}>
+                <Button size="sm" leftIcon={<Plus className="h-4 w-4" aria-hidden />} onClick={openNewEmpresa}>
                   Nueva empresa
                 </Button>
               }
@@ -144,9 +206,20 @@ export default function EmpresasPage() {
                         <td className="py-3 pr-4 font-mono text-xs text-muted-foreground">{e.rif}</td>
                         <td className="py-3 pr-4 text-muted-foreground">{e.direccion_fiscal || "—"}</td>
                         <td className="py-3 text-right">
-                          <Button variant="ghost" size="icon" aria-label="Eliminar" onClick={() => setEmpresaToDelete(e)}>
-                            <Trash2 className="h-4 w-4 text-danger" aria-hidden />
-                          </Button>
+                          <div className="inline-flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Editar"
+                              disabled={editLoading === e.id}
+                              onClick={() => openEditEmpresa(e)}
+                            >
+                              <Pencil className="h-4 w-4" aria-hidden />
+                            </Button>
+                            <Button variant="ghost" size="icon" aria-label="Eliminar" onClick={() => setEmpresaToDelete(e)}>
+                              <Trash2 className="h-4 w-4 text-danger" aria-hidden />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -165,7 +238,7 @@ export default function EmpresasPage() {
       ) : (
         <div className="space-y-4">
           <div className="flex justify-end">
-            <Button leftIcon={<Plus className="h-4 w-4" aria-hidden />} onClick={() => setTrabajadorModalOpen(true)}>
+            <Button leftIcon={<Plus className="h-4 w-4" aria-hidden />} onClick={openNewTrabajador}>
               Añadir trabajador
             </Button>
           </div>
@@ -184,7 +257,7 @@ export default function EmpresasPage() {
               title="Sin trabajadores"
               description="Esta empresa aún no tiene personal registrado."
               action={
-                <Button size="sm" leftIcon={<Plus className="h-4 w-4" aria-hidden />} onClick={() => setTrabajadorModalOpen(true)}>
+                <Button size="sm" leftIcon={<Plus className="h-4 w-4" aria-hidden />} onClick={openNewTrabajador}>
                   Añadir trabajador
                 </Button>
               }
@@ -212,9 +285,20 @@ export default function EmpresasPage() {
                           <Badge tone="success">{formatCurrency(Number(t.salario_base) || 0, currency)}</Badge>
                         </td>
                         <td className="py-3 text-right">
-                          <Button variant="ghost" size="icon" aria-label="Eliminar" onClick={() => setTrabajadorToDelete(t)}>
-                            <Trash2 className="h-4 w-4 text-danger" aria-hidden />
-                          </Button>
+                          <div className="inline-flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Editar"
+                              disabled={editLoading === t.id}
+                              onClick={() => openEditTrabajador(t)}
+                            >
+                              <Pencil className="h-4 w-4" aria-hidden />
+                            </Button>
+                            <Button variant="ghost" size="icon" aria-label="Eliminar" onClick={() => setTrabajadorToDelete(t)}>
+                              <Trash2 className="h-4 w-4 text-danger" aria-hidden />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -228,23 +312,55 @@ export default function EmpresasPage() {
 
       <Modal
         open={empresaModalOpen}
-        onClose={() => setEmpresaModalOpen(false)}
-        title="Registrar empresa"
-        description="Completa los datos mercantiles de la empresa."
+        onClose={() => {
+          setEmpresaModalOpen(false);
+          setEmpresaEdit(null);
+        }}
+        title={empresaEdit ? "Editar empresa" : "Registrar empresa"}
+        description={empresaEdit ? "Actualiza los datos mercantiles de la empresa." : "Completa los datos mercantiles de la empresa."}
         size="lg"
       >
-        <EmpresaForm onSubmit={handleCreateEmpresa} onCancel={() => setEmpresaModalOpen(false)} />
+        <EmpresaForm
+          key={empresaEdit?.id ?? "new"}
+          defaultValues={empresaEdit?.values}
+          excludeEmpresaId={empresaEdit?.id}
+          submitLabel={empresaEdit ? "Guardar cambios" : "Registrar empresa"}
+          onSubmit={handleCreateEmpresa}
+          onCancel={() => {
+            setEmpresaModalOpen(false);
+            setEmpresaEdit(null);
+          }}
+        />
       </Modal>
 
       <Modal
         open={trabajadorModalOpen}
-        onClose={() => setTrabajadorModalOpen(false)}
-        title="Añadir trabajador"
-        description="Registra un nuevo integrante del personal."
+        onClose={() => {
+          setTrabajadorModalOpen(false);
+          setTrabajadorEdit(null);
+        }}
+        title={trabajadorEdit ? "Editar trabajador" : "Añadir trabajador"}
+        description={trabajadorEdit ? "Actualiza los datos del integrante del personal." : "Registra un nuevo integrante del personal."}
         size="lg"
       >
-        <TrabajadorForm onSubmit={handleCreateTrabajador} onCancel={() => setTrabajadorModalOpen(false)} />
+        <TrabajadorForm
+          key={trabajadorEdit?.id ?? "new"}
+          defaultValues={trabajadorEdit?.values}
+          excludeTrabajadorId={trabajadorEdit?.id}
+          submitLabel={trabajadorEdit ? "Guardar cambios" : "Guardar trabajador"}
+          onSubmit={handleCreateTrabajador}
+          onCancel={() => {
+            setTrabajadorModalOpen(false);
+            setTrabajadorEdit(null);
+          }}
+        />
       </Modal>
+
+      <SaveSuccessModal
+        open={saveSuccess !== null}
+        kind={saveSuccess}
+        onClose={() => setSaveSuccess(null)}
+      />
 
       <ConfirmDialog
         open={Boolean(empresaToDelete)}

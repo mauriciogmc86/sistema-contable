@@ -262,3 +262,34 @@
   50% { transform: translateY(-10px); }
 }
 .animate-float-slow { animation: float-slow 7s ease-in-out infinite; }
+
+/* Print: only show document content (forms, nav, shell hidden via .no-print) */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+
+  main > div {
+    max-width: none !important;
+    margin: 0 !important;
+  }
+
+  .payroll-document,
+  .printable-contract {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 12mm !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+}
