@@ -1,6 +1,10 @@
 import { supabase } from "@/lib/supabase";
+import { getClausulasForCargo, listGlobalClausulas, type ClausulaRecord } from "./SupabaseClausulaRepository";
+
+export type { ClausulaRecord };
 
 export interface TrabajadorRow {
+  id?: string;
   cedula: string;
   primer_nombre?: string;
   segundo_nombre?: string;
@@ -9,9 +13,10 @@ export interface TrabajadorRow {
   estado_civil?: string;
   direccion_habitacion?: string;
   fecha_nacimiento?: string;
+  fecha_ingreso?: string;
   salario_base?: number;
   empresa_id?: string;
-  cargos?: { nombre_cargo?: string } | null;
+  cargos?: { id?: number; nombre_cargo?: string } | null;
 }
 
 export interface RepresentanteRow {
@@ -32,16 +37,19 @@ export interface EmpresaLegalRow {
   representantes?: RepresentanteRow[];
 }
 
-export interface ContractData {
+export interface WorkerDocumentData {
   empleado: TrabajadorRow;
   empresa: EmpresaLegalRow | null;
 }
 
-/** Read-only access to the legal/contract data sources. */
-export async function getContractByCedula(cedula: string): Promise<ContractData | null> {
+export interface ContractData extends WorkerDocumentData {
+  clausulas: ClausulaRecord[];
+}
+
+async function fetchWorkerWithEmpresaByCedula(cedula: string): Promise<WorkerDocumentData | null> {
   const { data: empleado, error } = await supabase
     .from("trabajadores")
-    .select("*, cargos(*)")
+    .select("*, cargos(id, nombre_cargo)")
     .eq("cedula", cedula)
     .maybeSingle();
 
@@ -59,4 +67,24 @@ export async function getContractByCedula(cedula: string): Promise<ContractData 
   }
 
   return { empleado: empleado as TrabajadorRow, empresa };
+}
+
+export { fetchWorkerWithEmpresaByCedula };
+
+/** Trabajador + empresa para documentos de nómina (carta de trabajo, amonestaciones). */
+export async function getWorkerDocumentByCedula(cedula: string): Promise<WorkerDocumentData | null> {
+  return fetchWorkerWithEmpresaByCedula(cedula);
+}
+
+/** Read-only access to the legal/contract data sources. */
+export async function getContractByCedula(cedula: string): Promise<ContractData | null> {
+  const base = await fetchWorkerWithEmpresaByCedula(cedula);
+  if (!base) return null;
+
+  const cargoId = (base.empleado.cargos as { id?: number } | null)?.id;
+  const clausulas = cargoId
+    ? await getClausulasForCargo(cargoId)
+    : await listGlobalClausulas();
+
+  return { ...base, clausulas };
 }

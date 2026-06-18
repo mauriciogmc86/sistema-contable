@@ -11,6 +11,7 @@ import { Button } from "@/presentation/components/atoms/Button";
 import { Input } from "@/presentation/components/atoms/Input";
 import { Select } from "@/presentation/components/atoms/Select";
 import { DuplicateRecordModal } from "@/presentation/components/molecules/DuplicateRecordModal";
+import { CargoSelect } from "@/presentation/components/molecules/CargoSelect";
 import { FormField } from "@/presentation/components/molecules/FormField";
 import { PrefixedCedulaInput } from "@/presentation/components/molecules/PrefixedCedulaInput";
 import { useCurrencyStore } from "@/presentation/store/useCurrencyStore";
@@ -34,6 +35,7 @@ const EMPTY_TRABAJADOR: TrabajadorFormValues = {
   direccion_habitacion: "",
   sueldo_base: 0,
   estado_civil: "Soltero",
+  es_fiscal: undefined as unknown as boolean,
   fecha_ingreso: "",
 };
 
@@ -146,9 +148,50 @@ export function TrabajadorForm({
             </Select>
           )}
         </FormField>
+        <FormField label="Tipo fiscal" required error={errors.es_fiscal?.message}>
+          {({ id, describedBy, invalid }) => (
+            <Controller
+              name="es_fiscal"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  id={id}
+                  aria-describedby={describedBy}
+                  invalid={invalid}
+                  value={field.value === undefined ? "" : String(field.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    field.onChange(value === "" ? undefined : value === "true");
+                  }}
+                  onBlur={field.onBlur}
+                >
+                  <option value="" disabled>
+                    Seleccionar
+                  </option>
+                  <option value="true">Fiscal</option>
+                  <option value="false">No fiscal</option>
+                </Select>
+              )}
+            />
+          )}
+        </FormField>
         <FormField label="Cargo / Puesto" required error={errors.cargo_nombre?.message}>
           {({ id, describedBy, invalid }) => (
-            <Input id={id} placeholder="Ej: Ayudante, Chofer, Vendedor" aria-describedby={describedBy} invalid={invalid} {...register("cargo_nombre")} />
+            <Controller
+              name="cargo_nombre"
+              control={control}
+              render={({ field }) => (
+                <CargoSelect
+                  id={id}
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  invalid={invalid}
+                  describedBy={describedBy}
+                  fallbackOption={defaultValues?.cargo_nombre}
+                />
+              )}
+            />
           )}
         </FormField>
         <FormField label={salaryLabel} required error={errors.sueldo_base?.message}>

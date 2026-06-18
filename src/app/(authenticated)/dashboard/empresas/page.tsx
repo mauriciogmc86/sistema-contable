@@ -270,6 +270,7 @@ export default function EmpresasPage() {
                     <tr>
                       <th className="py-2 pr-4">Cédula</th>
                       <th className="py-2 pr-4">Nombre</th>
+                      <th className="py-2 pr-4">Tipo</th>
                       <th className="py-2 pr-4 text-right">Sueldo base</th>
                       <th className="py-2 text-right">Acciones</th>
                     </tr>
@@ -280,6 +281,11 @@ export default function EmpresasPage() {
                         <td className="py-3 pr-4 font-mono text-xs text-muted-foreground">{t.cedula}</td>
                         <td className="py-3 pr-4 font-medium text-foreground">
                           {t.primer_nombre} {t.primer_apellido}
+                        </td>
+                        <td className="py-3 pr-4">
+                          <Badge tone={t.es_fiscal ? "info" : "neutral"}>
+                            {t.es_fiscal ? "Fiscal" : "No fiscal"}
+                          </Badge>
                         </td>
                         <td className="py-3 pr-4 text-right tabular-nums">
                           <Badge tone="success">{formatCurrency(Number(t.salario_base) || 0, currency)}</Badge>

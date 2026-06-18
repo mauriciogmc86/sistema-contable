@@ -3,7 +3,7 @@
 import { Button } from "@/presentation/components/atoms/Button";
 import { Modal } from "@/presentation/components/organisms/Modal";
 
-export type DuplicateRecordKind = "cedula" | "rif";
+export type DuplicateRecordKind = "cedula" | "rif" | "cargo";
 
 const MESSAGES: Record<DuplicateRecordKind, { title: string; description: string }> = {
   cedula: {
@@ -13,6 +13,10 @@ const MESSAGES: Record<DuplicateRecordKind, { title: string; description: string
   rif: {
     title: "RIF ya registrado",
     description: "Este RIF ya está registrado en el sistema. Verifica el número o edita la empresa existente.",
+  },
+  cargo: {
+    title: "Cargo ya registrado",
+    description: "Ya existe un cargo con ese nombre en el sistema. Verifica el nombre o edita el registro existente.",
   },
 };
 

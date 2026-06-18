@@ -24,3 +24,15 @@ export async function existsEmpresaRif(rif: string, excludeEmpresaId?: string): 
   if (error) throw new Error(error.message);
   return Boolean(data);
 }
+
+export async function existsCargoNombre(nombre: string, excludeId?: number): Promise<boolean> {
+  const trimmed = nombre.trim();
+  if (!trimmed) return false;
+
+  let query = supabase.from("cargos").select("id").ilike("nombre_cargo", trimmed);
+  if (excludeId !== undefined) query = query.neq("id", excludeId);
+
+  const { data, error } = await query.maybeSingle();
+  if (error) throw new Error(error.message);
+  return Boolean(data);
+}

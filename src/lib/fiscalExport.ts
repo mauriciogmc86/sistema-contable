@@ -1,18 +1,13 @@
 import { saveAs } from "file-saver";
 import type { PurchaseBookEntry, PurchaseBookSummary } from "@/domain/entities/PurchaseBookEntry";
 import { summarizePurchaseBook } from "@/domain/entities/PurchaseBookEntry";
+import { formatExcelDate } from "@/lib/excelFormat";
 
 export interface LibroComprasExportMeta {
   companyName: string;
   companyRif?: string;
   periodStart: string;
   periodEnd: string;
-}
-
-function formatExcelDate(isoDate: string): string {
-  const [y, m, d] = isoDate.split("-");
-  if (!y || !m || !d) return isoDate;
-  return `${d}/${m}/${y}`;
 }
 
 function formatPeriodLabel(isoDate: string): string {

@@ -263,6 +263,11 @@
 }
 .animate-float-slow { animation: float-slow 7s ease-in-out infinite; }
 
+/* Oculta marcas de agua centrales durante exportación PDF (html2canvas) */
+.pdf-export-hide {
+  visibility: hidden !important;
+}
+
 /* Print: only show document content (forms, nav, shell hidden via .no-print) */
 @media print {
   .no-print {
@@ -291,5 +296,60 @@
     padding: 12mm !important;
     box-shadow: none !important;
     border-radius: 0 !important;
+    overflow: visible !important;
+  }
+
+  .payroll-letter-document {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 25mm 20mm !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+  }
+
+  .contract-watermark {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 16cm !important;
+    max-width: 16cm !important;
+    max-height: 16cm !important;
+    opacity: 0.18 !important;
+    display: block !important;
+    visibility: visible !important;
+    z-index: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .payroll-header-watermark {
+    position: fixed !important;
+    top: 25mm !important;
+    left: 20mm !important;
+    width: 2.5cm !important;
+    height: 2.5cm !important;
+    opacity: 0.18 !important;
+    display: block !important;
+    visibility: visible !important;
+    z-index: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .contract-content {
+    position: relative !important;
+    z-index: 1 !important;
+  }
+
+  .payroll-letter-content {
+    position: relative !important;
+    z-index: 1 !important;
+  }
+
+  .pdf-export-hide {
+    visibility: hidden !important;
   }
 }

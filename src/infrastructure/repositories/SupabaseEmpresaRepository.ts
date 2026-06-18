@@ -1,4 +1,4 @@
-import type { EmpresaInput, TrabajadorInput } from "@/application/validation";
+import type { EmpresaInput, TrabajadorFiscalFilter, TrabajadorInput } from "@/application/validation";
 import { uploadEmpresaLogo } from "@/lib/empresaLogoStorage";
 import { supabase } from "@/lib/supabase";
 
@@ -17,6 +17,22 @@ export interface TrabajadorRecord {
   primer_apellido: string | null;
   segundo_apellido: string | null;
   salario_base: number | null;
+  es_fiscal: boolean;
+}
+
+export interface TrabajadorExportRecord {
+  cedula: string;
+  primer_nombre: string;
+  segundo_nombre: string | null;
+  primer_apellido: string;
+  segundo_apellido: string | null;
+  fecha_nacimiento: string;
+  estado_civil: string;
+  cargo_nombre: string;
+  direccion_habitacion: string;
+  salario_base: number;
+  fecha_ingreso: string;
+  es_fiscal: boolean;
 }
 
 async function resolveCargoId(cargoNombre: string): Promise<string | null> {
@@ -176,11 +192,49 @@ export async function deleteEmpresa(id: string): Promise<void> {
 export async function listTrabajadores(empresaId: string): Promise<TrabajadorRecord[]> {
   const { data, error } = await supabase
     .from("trabajadores")
-    .select("id, cedula, primer_nombre, primer_apellido, salario_base")
+    .select("id, cedula, primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, salario_base, es_fiscal")
     .eq("empresa_id", empresaId)
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
   return (data as TrabajadorRecord[]) ?? [];
+}
+
+export async function listTrabajadoresForExport(
+  empresaId: string,
+  filter: TrabajadorFiscalFilter = "all",
+): Promise<TrabajadorExportRecord[]> {
+  let query = supabase
+    .from("trabajadores")
+    .select(
+      "cedula, primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, fecha_nacimiento, estado_civil, direccion_habitacion, salario_base, fecha_ingreso, es_fiscal, cargos(nombre_cargo)",
+    )
+    .eq("empresa_id", empresaId)
+    .order("primer_apellido")
+    .order("primer_nombre");
+
+  if (filter === "fiscal") query = query.eq("es_fiscal", true);
+  if (filter === "no_fiscal") query = query.eq("es_fiscal", false);
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((row) => {
+    const cargo = row.cargos as { nombre_cargo?: string } | null;
+    return {
+      cedula: row.cedula ?? "",
+      primer_nombre: row.primer_nombre ?? "",
+      segundo_nombre: row.segundo_nombre ?? null,
+      primer_apellido: row.primer_apellido ?? "",
+      segundo_apellido: row.segundo_apellido ?? null,
+      fecha_nacimiento: row.fecha_nacimiento ?? "",
+      estado_civil: row.estado_civil ?? "",
+      cargo_nombre: cargo?.nombre_cargo ?? "",
+      direccion_habitacion: row.direccion_habitacion ?? "",
+      salario_base: Number(row.salario_base) || 0,
+      fecha_ingreso: row.fecha_ingreso ?? "",
+      es_fiscal: Boolean(row.es_fiscal),
+    };
+  });
 }
 
 export async function getTrabajador(id: string): Promise<TrabajadorInput> {
@@ -201,6 +255,7 @@ export async function getTrabajador(id: string): Promise<TrabajadorInput> {
     apellidos,
     fecha_nacimiento: data.fecha_nacimiento ?? "",
     estado_civil: data.estado_civil as TrabajadorInput["estado_civil"],
+    es_fiscal: Boolean(data.es_fiscal),
     cargo_nombre: cargo?.nombre_cargo ?? "",
     direccion_habitacion: data.direccion_habitacion ?? "",
     sueldo_base: Number(data.salario_base) || 0,
@@ -223,6 +278,7 @@ export async function createTrabajador(empresaId: string, input: TrabajadorInput
       segundo_apellido: apellidos.slice(1).join(" ") || null,
       fecha_nacimiento: input.fecha_nacimiento,
       estado_civil: input.estado_civil,
+      es_fiscal: input.es_fiscal,
       direccion_habitacion: input.direccion_habitacion,
       salario_base: input.sueldo_base,
       fecha_ingreso: input.fecha_ingreso,
@@ -247,6 +303,7 @@ export async function updateTrabajador(id: string, input: TrabajadorInput): Prom
       segundo_apellido: apellidos.slice(1).join(" ") || null,
       fecha_nacimiento: input.fecha_nacimiento,
       estado_civil: input.estado_civil,
+      es_fiscal: input.es_fiscal,
       direccion_habitacion: input.direccion_habitacion,
       salario_base: input.sueldo_base,
       fecha_ingreso: input.fecha_ingreso,

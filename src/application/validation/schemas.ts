@@ -53,6 +53,9 @@ export type EmpresaInput = z.infer<typeof empresaSchema>;
 /* -------------------------------------------------------------------------- */
 export const ESTADOS_CIVILES = ["Soltero", "Casado", "Divorciado", "Viudo"] as const;
 
+export const TRABAJADOR_FISCAL_FILTERS = ["all", "fiscal", "no_fiscal"] as const;
+export type TrabajadorFiscalFilter = (typeof TRABAJADOR_FISCAL_FILTERS)[number];
+
 export const trabajadorSchema = z.object({
   cedula: cedulaDigitsSchema,
   nombres: requiredText("Los nombres"),
@@ -60,6 +63,9 @@ export const trabajadorSchema = z.object({
   fecha_nacimiento: isoDateSchema,
   estado_civil: z.enum(ESTADOS_CIVILES, {
     errorMap: () => ({ message: "Selecciona el estado civil" }),
+  }),
+  es_fiscal: z.boolean({
+    errorMap: () => ({ message: "Selecciona el tipo fiscal" }),
   }),
   cargo_nombre: requiredText("El cargo"),
   direccion_habitacion: requiredText("La dirección de habitación"),
@@ -99,6 +105,29 @@ export const liquidationCalculationSchema = payrollWorkerFieldsSchema.extend({
   fechaDocumento: z.string().optional(),
 });
 export type LiquidationCalculationFormInput = z.infer<typeof liquidationCalculationSchema>;
+
+/* -------------------------------------------------------------------------- */
+/*  Carta de trabajo / Amonestaciones (nómina, con BD)                         */
+/* -------------------------------------------------------------------------- */
+export const CONVERSION_CURRENCIES = ["USD", "EUR"] as const;
+
+export const cartaTrabajoSchema = z.object({
+  tasaBcv: z.coerce.number().positive("La tasa BCV debe ser mayor a cero"),
+  monedaConversion: z.enum(CONVERSION_CURRENCIES, {
+    errorMap: () => ({ message: "Selecciona la moneda de conversión" }),
+  }),
+  ciudad: z.string().trim().optional(),
+  fechaDocumento: z.string().optional(),
+});
+export type CartaTrabajoFormInput = z.infer<typeof cartaTrabajoSchema>;
+
+
+export const amonestacionSchema = z.object({
+  clausula: requiredText("La cláusula", 20),
+  ciudad: z.string().trim().optional(),
+  fechaDocumento: z.string().optional(),
+});
+export type AmonestacionFormInput = z.infer<typeof amonestacionSchema>;
 
 /* -------------------------------------------------------------------------- */
 /*  Cliente                                                                    */
@@ -185,3 +214,28 @@ export const compraSchema = z
     path: ["exemptAmount"],
   });
 export type CompraInput = z.infer<typeof compraSchema>;
+
+/* -------------------------------------------------------------------------- */
+/*  Cargos y Cláusulas                                                        */
+/* -------------------------------------------------------------------------- */
+export const clausulaItemSchema = z.object({
+  id: z.string().optional(),
+  titulo: requiredText("El título"),
+  descripcion: requiredText("La descripción"),
+  orden: z.coerce.number().int().nonnegative().default(0).optional(),
+});
+export type ClausulaItemInput = z.infer<typeof clausulaItemSchema>;
+
+export const cargoSchema = z.object({
+  nombre_cargo: requiredText("El nombre del cargo"),
+  funciones: z.string().trim().optional(),
+  clausulas: z.array(clausulaItemSchema).default([]),
+});
+export type CargoInput = z.infer<typeof cargoSchema>;
+
+export const clausulaGlobalSchema = z.object({
+  titulo: requiredText("El título"),
+  descripcion: requiredText("La descripción"),
+  orden: z.coerce.number().int().nonnegative().default(0).optional(),
+});
+export type ClausulaGlobalInput = z.infer<typeof clausulaGlobalSchema>;

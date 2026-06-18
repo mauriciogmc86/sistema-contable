@@ -1,7 +1,9 @@
 import {
   BarChart3,
   BookOpen,
+  Briefcase,
   Building2,
+  FileSpreadsheet,
   LayoutDashboard,
   ListTree,
   type LucideIcon,
@@ -45,7 +47,9 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "Gestión",
     items: [
       { label: "Nómina", href: "/dashboard/laboral", icon: Users },
+      { label: "Reporte Personal", href: "/dashboard/reportes-personal", icon: FileSpreadsheet },
       { label: "Legal", href: "/dashboard/legal", icon: Scale },
+      { label: "Cargos", href: "/dashboard/cargos", icon: Briefcase },
       { label: "Configuración", href: "/dashboard/configuracion", icon: Settings },
     ],
   },

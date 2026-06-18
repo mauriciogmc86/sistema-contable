@@ -8,7 +8,11 @@ export type SaveSuccessKind =
   | "empresa-created"
   | "empresa-updated"
   | "trabajador-created"
-  | "trabajador-updated";
+  | "trabajador-updated"
+  | "cargo-created"
+  | "cargo-updated"
+  | "clausula-created"
+  | "clausula-updated";
 
 const MESSAGES: Record<SaveSuccessKind, { title: string; description: string }> = {
   "empresa-created": {
@@ -26,6 +30,22 @@ const MESSAGES: Record<SaveSuccessKind, { title: string; description: string }> 
   "trabajador-updated": {
     title: "Trabajador actualizado",
     description: "Los cambios del trabajador se guardaron correctamente.",
+  },
+  "cargo-created": {
+    title: "Cargo registrado",
+    description: "El cargo y sus cláusulas se guardaron correctamente.",
+  },
+  "cargo-updated": {
+    title: "Cargo actualizado",
+    description: "Los cambios del cargo se guardaron correctamente.",
+  },
+  "clausula-created": {
+    title: "Cláusula global registrada",
+    description: "La cláusula global se guardó correctamente.",
+  },
+  "clausula-updated": {
+    title: "Cláusula global actualizada",
+    description: "Los cambios de la cláusula global se guardaron correctamente.",
   },
 };
 
