@@ -302,10 +302,12 @@ export default function LaboralPage() {
                           amonestacionWorker.empleado.cedula,
                         );
                         if (refreshed) setAmonestacionWorker(refreshed);
+                        setAmonestacionRecord(null);
                         setAmonestacionRefreshKey((k) => k + 1);
                       }}
                     />
                     <AmonestacionForm
+                      key={`${amonestacionWorker.trabajadorId}-${amonestacionRefreshKey}`}
                       worker={amonestacionWorker}
                       onGenerated={setAmonestacionRecord}
                     />

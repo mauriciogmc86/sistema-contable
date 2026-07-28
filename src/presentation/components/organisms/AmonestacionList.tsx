@@ -129,7 +129,7 @@ export function AmonestacionList({ worker, onChanged }: AmonestacionListProps) {
       <ConfirmDialog
         open={confirmDeleteAll}
         title="Eliminar todas las amonestaciones"
-        description={`¿Eliminar las ${records.length} amonestaciones registradas para este trabajador? Esta acción no se puede deshacer.`}
+        description={`¿Eliminar las ${records.length} amonestaciones registradas para este trabajador? El contador volverá a -01 para la próxima amonestación.`}
         confirmLabel="Eliminar todas"
         destructive
         loading={deletingId === "all"}
