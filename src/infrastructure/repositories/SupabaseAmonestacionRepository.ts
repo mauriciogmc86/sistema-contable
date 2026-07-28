@@ -5,6 +5,7 @@ import {
 } from "@/infrastructure/repositories/SupabaseLegalRepository";
 import { getClausulasForCargo, listGlobalClausulas } from "@/infrastructure/repositories/SupabaseClausulaRepository";
 import { buildDefaultClausulaText } from "@/lib/amonestacionUtils";
+import { normalizeCedula } from "@/lib/venezuelanId";
 
 export interface AmonestacionRecord {
   id: string;
@@ -88,4 +89,29 @@ export async function listAmonestacionesByTrabajadorId(trabajadorId: string): Pr
     .order("numero_trabajador", { ascending: true });
   if (error) throw new Error(error.message);
   return (data as AmonestacionRecord[]) ?? [];
+}
+
+export async function deleteAmonestacionById(id: string): Promise<void> {
+  const { error } = await supabase.rpc("eliminar_amonestacion", { p_amonestacion_id: id });
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteAllAmonestacionesByTrabajadorId(trabajadorId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("eliminar_amonestaciones_por_trabajador", {
+    p_trabajador_id: trabajadorId,
+  });
+  if (error) throw new Error(error.message);
+  return (data as number) ?? 0;
+}
+
+/** Elimina todas las amonestaciones registradas para una cédula. */
+export async function deleteAmonestacionesByCedula(cedula: string): Promise<number> {
+  const normalized = normalizeCedula(cedula);
+  const base = await fetchWorkerWithEmpresaByCedula(normalized);
+  if (!base) throw new Error("No se encontró un trabajador con esa cédula.");
+
+  const trabajadorId = (base.empleado as { id?: string }).id;
+  if (!trabajadorId) throw new Error("El trabajador no tiene identificador válido.");
+
+  return deleteAllAmonestacionesByTrabajadorId(trabajadorId);
 }

@@ -35,6 +35,7 @@ import { DocumentExportActions } from "@/presentation/components/molecules/Docum
 import { WorkerCedulaSearch } from "@/presentation/components/molecules/WorkerCedulaSearch";
 import { AmonestacionDocument } from "@/presentation/components/organisms/AmonestacionDocument";
 import { AmonestacionForm } from "@/presentation/components/organisms/AmonestacionForm";
+import { AmonestacionList } from "@/presentation/components/organisms/AmonestacionList";
 import { CartaTrabajoDocument } from "@/presentation/components/organisms/CartaTrabajoDocument";
 import { CartaTrabajoForm } from "@/presentation/components/organisms/CartaTrabajoForm";
 import { LiquidationCalculationForm } from "@/presentation/components/organisms/LiquidationCalculationForm";
@@ -88,6 +89,7 @@ export default function LaboralPage() {
 
   const [amonestacionWorker, setAmonestacionWorker] = useState<AmonestacionWorkerContext | null>(null);
   const [amonestacionRecord, setAmonestacionRecord] = useState<AmonestacionRecord | null>(null);
+  const [amonestacionRefreshKey, setAmonestacionRefreshKey] = useState(0);
 
   const empresaQuery = useAsync(async (): Promise<PayrollEmpresaContext | null> => {
     if (!activeCompanyId) return null;
@@ -291,10 +293,23 @@ export default function LaboralPage() {
                   onClear={resetAmonestacion}
                 />
                 {amonestacionWorker && (
-                  <AmonestacionForm
-                    worker={amonestacionWorker}
-                    onGenerated={setAmonestacionRecord}
-                  />
+                  <>
+                    <AmonestacionList
+                      key={`${amonestacionWorker.trabajadorId}-${amonestacionRefreshKey}`}
+                      worker={amonestacionWorker}
+                      onChanged={async () => {
+                        const refreshed = await getAmonestacionContextByCedula(
+                          amonestacionWorker.empleado.cedula,
+                        );
+                        if (refreshed) setAmonestacionWorker(refreshed);
+                        setAmonestacionRefreshKey((k) => k + 1);
+                      }}
+                    />
+                    <AmonestacionForm
+                      worker={amonestacionWorker}
+                      onGenerated={setAmonestacionRecord}
+                    />
+                  </>
                 )}
               </CardContent>
             </Card>
