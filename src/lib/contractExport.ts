@@ -1,5 +1,6 @@
 import {
   Document,
+  Header,
   ImageRun,
   Packer,
   Paragraph,
@@ -12,6 +13,12 @@ import {
   WidthType,
   BorderStyle,
   VerticalAlign,
+  TableLayoutType,
+  HorizontalPositionAlign,
+  HorizontalPositionRelativeFrom,
+  VerticalPositionAlign,
+  VerticalPositionRelativeFrom,
+  TextWrappingType,
 } from "docx";
 import { saveAs } from "file-saver";
 import type { ContractData } from "@/infrastructure/repositories/SupabaseLegalRepository";
@@ -22,6 +29,7 @@ import {
   fechaNumerica,
 } from "@/lib/contractUtils";
 import { buildClauseContext, resolveClauseText } from "@/lib/contractClauses";
+import { sortClausulas } from "@/lib/clausulaOrdering";
 
 const BLANK = "________";
 
@@ -41,6 +49,16 @@ function para(runs: TextRun[], opts?: { center?: boolean; bold?: boolean }): Par
   });
 }
 
+const CONTENT_WIDTH_DXA = 9026;
+const SIG_COL_WIDTHS = [4062, 902, 4062] as const;
+
+const noBorder = {
+  top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+  bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+  left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+  right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+};
+
 async function loadLogoImage(url: string): Promise<{ data: Uint8Array; type: "png" | "jpg" | "gif" | "bmp" } | null> {
   try {
     const res = await fetch(url);
@@ -57,9 +75,166 @@ async function loadLogoImage(url: string): Promise<{ data: Uint8Array; type: "pn
   }
 }
 
+/** Reduce opacidad del logo para marca de agua (solo en navegador). */
+async function fadeLogoToPng(
+  logo: { data: Uint8Array; type: "png" | "jpg" | "gif" | "bmp" },
+  opacity: number,
+): Promise<Uint8Array | null> {
+  if (typeof document === "undefined") return logo.data;
+
+  const mime =
+    logo.type === "jpg"
+      ? "image/jpeg"
+      : logo.type === "gif"
+      ? "image/gif"
+      : logo.type === "bmp"
+      ? "image/bmp"
+      : "image/png";
+
+  return new Promise((resolve) => {
+    const blob = new Blob([Uint8Array.from(logo.data)], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        URL.revokeObjectURL(url);
+        resolve(null);
+        return;
+      }
+      ctx.globalAlpha = opacity;
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob(async (png) => {
+        URL.revokeObjectURL(url);
+        if (!png) {
+          resolve(null);
+          return;
+        }
+        resolve(new Uint8Array(await png.arrayBuffer()));
+      }, "image/png");
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(null);
+    };
+    img.src = url;
+  });
+}
+
+function signatureLine(): Paragraph {
+  return new Paragraph({
+    border: {
+      top: { style: BorderStyle.SINGLE, size: 6, color: "000000", space: 1 },
+    },
+    spacing: { before: 720, after: 80 },
+  });
+}
+
+function signatureLabel(text: string): Paragraph {
+  return new Paragraph({
+    children: [new TextRun({ text, bold: true })],
+    alignment: AlignmentType.CENTER,
+  });
+}
+
+function buildMainSignatureTable(): Table {
+  return new Table({
+    width: { size: CONTENT_WIDTH_DXA, type: WidthType.DXA },
+    layout: TableLayoutType.FIXED,
+    columnWidths: [...SIG_COL_WIDTHS],
+    borders: noBorder,
+    rows: [
+      new TableRow({
+        children: [
+          new TableCell({
+            borders: noBorder,
+            children: [signatureLine(), signatureLabel("EL TRABAJADOR")],
+          }),
+          new TableCell({
+            borders: noBorder,
+            children: [new Paragraph({ children: [] })],
+          }),
+          new TableCell({
+            borders: noBorder,
+            children: [signatureLine(), signatureLabel("EL PATRONO")],
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
+function buildAcuseSignatureTable(): Table {
+  return new Table({
+    width: { size: CONTENT_WIDTH_DXA, type: WidthType.DXA },
+    layout: TableLayoutType.FIXED,
+    columnWidths: [...SIG_COL_WIDTHS],
+    borders: noBorder,
+    rows: [
+      new TableRow({
+        children: [
+          new TableCell({
+            borders: noBorder,
+            children: [
+              signatureLine(),
+              signatureLabel("Firma del TRABAJADOR"),
+              new Paragraph({
+                children: [new TextRun({ text: "Huellas Dactilares", size: 22 })],
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 60 },
+              }),
+            ],
+          }),
+          new TableCell({
+            borders: noBorder,
+            children: [new Paragraph({ children: [] })],
+          }),
+          new TableCell({
+            borders: noBorder,
+            children: [new Paragraph({ children: [] })],
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
+function buildWatermarkHeader(watermarkData: Uint8Array): Header {
+  return new Header({
+    children: [
+      new Paragraph({
+        children: [
+          new ImageRun({
+            type: "png",
+            data: watermarkData,
+            transformation: { width: 360, height: 360 },
+            floating: {
+              horizontalPosition: {
+                relative: HorizontalPositionRelativeFrom.PAGE,
+                align: HorizontalPositionAlign.CENTER,
+              },
+              verticalPosition: {
+                relative: VerticalPositionRelativeFrom.PAGE,
+                align: VerticalPositionAlign.CENTER,
+              },
+              behindDocument: true,
+              allowOverlap: true,
+              wrap: { type: TextWrappingType.NONE },
+            },
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
 /** Build the full contract text as a docx Document */
 async function buildDocument(data: ContractData): Promise<Document> {
-  const { empleado, empresa, clausulas } = data;
+  const { empleado, empresa, clausulas: rawClausulas } = data;
+  const clausulas = sortClausulas(rawClausulas);
   const rep = empresa?.representantes?.[0];
 
   const fullName =
@@ -104,90 +279,63 @@ async function buildDocument(data: ContractData): Promise<Document> {
     ? String(new Date(empresa.fecha_constitucion + "T00:00:00").getFullYear())
     : BLANK;
 
-  const noBorder = {
-    top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-    bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-    left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-    right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-  };
-
-  const signatureTable = new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
-    borders: noBorder,
-    rows: [
-      new TableRow({
-        children: [
-          new TableCell({
-            width: { size: 45, type: WidthType.PERCENTAGE },
-            verticalAlign: VerticalAlign.BOTTOM,
-            borders: {
-              top: { style: BorderStyle.SINGLE, size: 8, color: "000000" },
-              bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-              left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-              right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-            },
-            children: [
-              new Paragraph({
-                children: [new TextRun({ text: "EL TRABAJADOR", bold: true })],
-                alignment: AlignmentType.CENTER,
-              }),
-            ],
-          }),
-          new TableCell({
-            width: { size: 10, type: WidthType.PERCENTAGE },
-            borders: noBorder,
-            children: [new Paragraph({ children: [] })],
-          }),
-          new TableCell({
-            width: { size: 45, type: WidthType.PERCENTAGE },
-            verticalAlign: VerticalAlign.BOTTOM,
-            borders: {
-              top: { style: BorderStyle.SINGLE, size: 8, color: "000000" },
-              bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-              left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-              right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-            },
-            children: [
-              new Paragraph({
-                children: [new TextRun({ text: "EL PATRONO", bold: true })],
-                alignment: AlignmentType.CENTER,
-              }),
-            ],
-          }),
-        ],
-      }),
-    ],
-  });
-
-  const logoSections: Paragraph[] = [];
   const logo = empresa?.logo_url ? await loadLogoImage(empresa.logo_url) : null;
-  if (logo) {
-    logoSections.push(
-      new Paragraph({
-        children: [
-          new ImageRun({
-            type: logo.type,
-            data: logo.data,
-            transformation: { width: 140, height: 70 },
-          }),
-        ],
-        spacing: { after: 200 },
-      }),
-    );
-  }
+  const watermarkPng =
+    logo != null ? await fadeLogoToPng(logo, 0.18) : null;
+  const headerLogoPng =
+    logo != null ? await fadeLogoToPng(logo, 0.35) : null;
 
-  const sections: Paragraph[] = [
-    ...logoSections,
+  const titleParagraphs = [
     new Paragraph({
-      children: [
-        bold("CONTRATO DE TRABAJO POR TIEMPO DETERMINADO\n"),
-        bold("LOTTT GACETA OFICIAL EXT 6.076 DEL 7-05-2012 ART 62"),
-      ],
+      children: [bold("CONTRATO DE TRABAJO POR TIEMPO DETERMINADO")],
       alignment: AlignmentType.CENTER,
       heading: HeadingLevel.HEADING_2,
+      spacing: { after: 80 },
+    }),
+    new Paragraph({
+      children: [bold("LOTTT GACETA OFICIAL EXT 6.076 DEL 7-05-2012 ART 62")],
+      alignment: AlignmentType.CENTER,
       spacing: { after: 280 },
     }),
+  ];
 
+  const headerBlock =
+    headerLogoPng != null
+      ? new Table({
+          width: { size: CONTENT_WIDTH_DXA, type: WidthType.DXA },
+          layout: TableLayoutType.FIXED,
+          columnWidths: [1625, 7401],
+          borders: noBorder,
+          rows: [
+            new TableRow({
+              children: [
+                new TableCell({
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: noBorder,
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new ImageRun({
+                          type: "png",
+                          data: headerLogoPng,
+                          transformation: { width: 52, height: 52 },
+                        }),
+                      ],
+                    }),
+                  ],
+                }),
+                new TableCell({
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: noBorder,
+                  children: titleParagraphs,
+                }),
+              ],
+            }),
+          ],
+        })
+      : titleParagraphs;
+
+  const sections: Paragraph[] = [
     para([
       normal("Entre la Sociedad Mercantil, "),
       bold(empresa?.nombre || BLANK),
@@ -233,12 +381,18 @@ async function buildDocument(data: ContractData): Promise<Document> {
     ]),
 
     // Cláusulas dinámicas
-    ...clausulas.map((clausula) =>
-      para([
-        bold(clausula.titulo.toUpperCase() + ". "),
-        normal(resolveClauseText(clausula.descripcion, ctx)),
-      ])
-    ),
+    ...(clausulas.length === 0
+      ? [
+          para([
+            normal("(Sin cláusulas configuradas para este cargo)"),
+          ]),
+        ]
+      : clausulas.map((clausula) =>
+          para([
+            bold(clausula.titulo.toUpperCase() + ". "),
+            normal(resolveClauseText(clausula.descripcion, ctx)),
+          ]),
+        )),
 
     // Spacing before signatures
     new Paragraph({ children: [], spacing: { after: 600 } }),
@@ -272,6 +426,8 @@ async function buildDocument(data: ContractData): Promise<Document> {
     new Paragraph({ children: [], spacing: { after: 600 } }),
   ];
 
+  const headerChildren = Array.isArray(headerBlock) ? headerBlock : [headerBlock];
+
   return new Document({
     styles: {
       default: {
@@ -285,11 +441,20 @@ async function buildDocument(data: ContractData): Promise<Document> {
     },
     sections: [
       {
+        headers: watermarkPng
+          ? { default: buildWatermarkHeader(watermarkPng) }
+          : undefined,
+        properties: {
+          page: {
+            margin: { top: 1134, right: 1134, bottom: 1134, left: 1134 },
+          },
+        },
         children: [
+          ...headerChildren,
           ...sections,
-          signatureTable,
+          buildMainSignatureTable(),
           ...acuseSections,
-          signatureTable,
+          buildAcuseSignatureTable(),
         ],
       },
     ],
@@ -354,42 +519,55 @@ export async function exportToPdf(elementId: string, filename: string): Promise<
 
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = element.classList.contains("payroll-letter-document") ? 0 : 10;
+  const isPayrollLetter = element.classList.contains("payroll-letter-document");
+  const margin = isPayrollLetter ? 0 : 10;
   const contentWidth = pageWidth - margin * 2;
-  const imgHeight = (canvas.height * contentWidth) / canvas.width;
+  let imgHeight = (canvas.height * contentWidth) / canvas.width;
+  let renderWidth = contentWidth;
+  let renderHeight = imgHeight;
+  let xOffset = margin;
+  let yOffset = margin;
 
-  let yOffset = 0;
-  let remainingHeight = imgHeight;
-  let pageIndex = 0;
+  // Cartas laborales (amonestación, constancia): siempre una sola hoja A4
+  if (isPayrollLetter && imgHeight > pageHeight) {
+    const scale = pageHeight / imgHeight;
+    renderWidth = contentWidth * scale;
+    renderHeight = pageHeight;
+    xOffset = (pageWidth - renderWidth) / 2;
+    yOffset = 0;
+  }
 
-  while (remainingHeight > 0) {
-    if (pageIndex > 0) pdf.addPage();
-
-    if (watermarkDataUrl) {
-      const wmWidth = 120;
-      const wmHeight = wmWidth * watermarkAspect;
-      pdf.addImage(
-        watermarkDataUrl,
-        "PNG",
-        (pageWidth - wmWidth) / 2,
-        (pageHeight - wmHeight) / 2,
-        wmWidth,
-        wmHeight,
-      );
-    }
-
+  const addWatermark = () => {
+    if (!watermarkDataUrl) return;
+    const wmWidth = 120;
+    const wmHeight = wmWidth * watermarkAspect;
     pdf.addImage(
-      imgData,
+      watermarkDataUrl,
       "PNG",
-      margin,
-      margin - yOffset,
-      contentWidth,
-      imgHeight,
+      (pageWidth - wmWidth) / 2,
+      (pageHeight - wmHeight) / 2,
+      wmWidth,
+      wmHeight,
     );
+  };
 
-    yOffset += pageHeight - margin * 2;
-    remainingHeight -= pageHeight - margin * 2;
-    pageIndex += 1;
+  if (isPayrollLetter) {
+    addWatermark();
+    pdf.addImage(imgData, "PNG", xOffset, yOffset, renderWidth, renderHeight);
+  } else {
+    let sliceOffset = 0;
+    let remainingHeight = imgHeight;
+    let pageIndex = 0;
+
+    while (remainingHeight > 0) {
+      if (pageIndex > 0) pdf.addPage();
+      addWatermark();
+      pdf.addImage(imgData, "PNG", margin, margin - sliceOffset, contentWidth, imgHeight);
+
+      sliceOffset += pageHeight - margin * 2;
+      remainingHeight -= pageHeight - margin * 2;
+      pageIndex += 1;
+    }
   }
 
   pdf.save(filename);

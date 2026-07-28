@@ -8,7 +8,7 @@ export function PayrollLetterStyles() {
         color: #111;
         width: 100%;
         max-width: 210mm;
-        min-height: 297mm;
+        min-height: auto;
         margin: 0 auto;
         padding: 25mm 20mm;
         font-family: "Times New Roman", Times, serif;

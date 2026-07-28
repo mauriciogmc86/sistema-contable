@@ -25,7 +25,7 @@ export function AmonestacionDocument({ data, record }: AmonestacionDocumentProps
 
   return (
     <>
-      <div id="printable-amonestacion" className="payroll-letter-document">
+      <div id="printable-amonestacion" className="payroll-letter-document payroll-letter-document--amonestacion">
         <PayrollLetterWatermarks logoUrl={empresa?.logo_url} showHeader={false} />
         <div className="payroll-letter-content">
           <p className="payroll-letter-date">
@@ -105,32 +105,52 @@ export function AmonestacionDocument({ data, record }: AmonestacionDocumentProps
 
       <PayrollLetterStyles />
       <style jsx global>{`
+        .payroll-letter-document--amonestacion {
+          min-height: auto !important;
+          padding: 14mm 18mm !important;
+          font-size: 12px;
+          line-height: 1.42;
+        }
+        .payroll-letter-document--amonestacion .payroll-letter-date {
+          margin: 0 0 10px;
+          font-size: 11px;
+        }
+        .payroll-letter-document--amonestacion .payroll-letter-title {
+          margin: 10px 0 8px;
+          font-size: 14px;
+        }
+        .payroll-letter-document--amonestacion .payroll-letter-body {
+          margin-bottom: 6px;
+        }
+        .payroll-letter-document--amonestacion .payroll-letter-body p {
+          margin: 0 0 7px;
+        }
         .payroll-letter-code-section {
-          margin-bottom: 4px;
+          margin-bottom: 2px;
         }
         .payroll-letter-inline-logo {
           display: block;
-          width: 72px;
-          height: 72px;
+          width: 56px;
+          height: 56px;
           object-fit: contain;
           opacity: 0.2;
-          margin-bottom: 6px;
+          margin-bottom: 4px;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
         }
         .payroll-letter-code {
           font-weight: bold;
-          margin: 0 0 16px;
+          margin: 0 0 10px;
         }
         .payroll-letter-recipient {
-          margin: 0 0 20px;
-          line-height: 1.6;
+          margin: 0 0 12px;
+          line-height: 1.45;
         }
         .payroll-letter-signatures {
           display: flex;
           justify-content: space-between;
-          gap: 32px;
-          margin-top: 48px;
+          gap: 24px;
+          margin-top: 18px;
         }
         .payroll-letter-signature-col {
           flex: 1;
@@ -138,8 +158,27 @@ export function AmonestacionDocument({ data, record }: AmonestacionDocumentProps
         }
         .payroll-letter-signature-line {
           border-top: 1px solid #111;
-          margin: 8px 0;
+          margin: 6px 0;
           min-height: 1px;
+        }
+        .payroll-letter-document--amonestacion .payroll-letter-signature-role {
+          font-size: 11px;
+        }
+        @media print {
+          .payroll-letter-document--amonestacion {
+            min-height: auto !important;
+            height: auto !important;
+            max-height: none;
+            padding: 12mm 16mm !important;
+            page-break-after: avoid;
+            page-break-inside: avoid;
+          }
+          .payroll-letter-document--amonestacion .contract-watermark {
+            position: absolute !important;
+          }
+          .payroll-letter-document--amonestacion .payroll-letter-signatures {
+            page-break-inside: avoid;
+          }
         }
       `}</style>
     </>
