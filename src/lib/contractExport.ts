@@ -522,7 +522,7 @@ export async function exportToPdf(elementId: string, filename: string): Promise<
   const isPayrollLetter = element.classList.contains("payroll-letter-document");
   const margin = isPayrollLetter ? 0 : 10;
   const contentWidth = pageWidth - margin * 2;
-  let imgHeight = (canvas.height * contentWidth) / canvas.width;
+  const imgHeight = (canvas.height * contentWidth) / canvas.width;
   let renderWidth = contentWidth;
   let renderHeight = imgHeight;
   let xOffset = margin;
