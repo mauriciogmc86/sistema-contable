@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import type { ClausulaGlobalInput } from "@/application/validation";
 import type { ClausulaRecord } from "./SupabaseCargoRepository";
+import { mergeClausulasForContract } from "@/lib/clausulaOrdering";
 
 export type { ClausulaRecord };
 
@@ -15,13 +16,22 @@ export async function listGlobalClausulas(): Promise<ClausulaRecord[]> {
 }
 
 export async function getClausulasForCargo(cargoId: number): Promise<ClausulaRecord[]> {
-  const { data, error } = await supabase
-    .from("clausulas")
-    .select("id, titulo, descripcion, cargo_id, es_global, orden")
-    .or(`es_global.eq.true,cargo_id.eq.${cargoId}`)
-    .order("orden", { ascending: true });
-  if (error) throw new Error(error.message);
-  return (data as ClausulaRecord[]) ?? [];
+  const [globals, cargoResult] = await Promise.all([
+    listGlobalClausulas(),
+    supabase
+      .from("clausulas")
+      .select("id, titulo, descripcion, cargo_id, es_global, orden")
+      .eq("cargo_id", cargoId)
+      .order("orden", { ascending: true }),
+  ]);
+
+  if (cargoResult.error) throw new Error(cargoResult.error.message);
+
+  const cargoClausulas = ((cargoResult.data as ClausulaRecord[]) ?? []).filter(
+    (row) => row.es_global !== true,
+  );
+
+  return mergeClausulasForContract(globals, cargoClausulas);
 }
 
 export async function createGlobalClausula(input: ClausulaGlobalInput): Promise<ClausulaRecord> {

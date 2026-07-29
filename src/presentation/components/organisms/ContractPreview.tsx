@@ -7,7 +7,9 @@ import {
   fechaNumerica,
 } from "@/lib/contractUtils";
 import { buildClauseContext, resolveClauseText } from "@/lib/contractClauses";
+import { sortClausulas } from "@/lib/clausulaOrdering";
 import type { ContractData } from "@/infrastructure/repositories/SupabaseLegalRepository";
+import { PayrollLetterWatermarks } from "@/presentation/components/molecules/PayrollLetterWatermarks";
 
 interface ContractPreviewProps {
   data: ContractData;
@@ -20,7 +22,8 @@ const B = ({ children }: { children: React.ReactNode }) => (
 const BLANK = "________";
 
 export function ContractPreview({ data }: ContractPreviewProps) {
-  const { empleado, empresa, clausulas } = data;
+  const { empleado, empresa, clausulas: rawClausulas } = data;
+  const clausulas = sortClausulas(rawClausulas);
   const rep = empresa?.representantes?.[0];
 
   const fullNameTrabajador =
@@ -68,18 +71,19 @@ export function ContractPreview({ data }: ContractPreviewProps) {
   return (
     <>
       <div id="printable-contract" className="printable-contract">
-        {empresa?.logo_url && (
-          <img
-            src={empresa.logo_url}
-            alt=""
-            aria-hidden
-            className="contract-watermark"
-            crossOrigin="anonymous"
-          />
-        )}
+        <PayrollLetterWatermarks logoUrl={empresa?.logo_url} showHeader={false} />
         <div className="contract-content">
-        {/* ── TÍTULO ── */}
+        {/* ── TÍTULO (logo solo aquí, primera hoja) ── */}
         <div className="contract-header">
+          {empresa?.logo_url && (
+            <img
+              src={empresa.logo_url}
+              alt=""
+              aria-hidden
+              className="contract-header-logo"
+              crossOrigin="anonymous"
+            />
+          )}
           <div className="contract-title">
             CONTRATO DE TRABAJO POR TIEMPO DETERMINADO
             <br />
@@ -211,7 +215,22 @@ export function ContractPreview({ data }: ContractPreviewProps) {
           z-index: 1;
         }
         .contract-header {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
           margin-bottom: 16px;
+        }
+        .contract-header-logo {
+          width: 52px;
+          height: 52px;
+          object-fit: contain;
+          opacity: 0.2;
+          flex-shrink: 0;
+          pointer-events: none;
+          user-select: none;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
         .contract-title {
           text-align: center;
@@ -219,6 +238,7 @@ export function ContractPreview({ data }: ContractPreviewProps) {
           font-size: 14px;
           text-transform: uppercase;
           letter-spacing: 0.02em;
+          flex: 0 1 auto;
         }
         .contract-body {
           text-align: justify;
@@ -295,6 +315,11 @@ export function ContractPreview({ data }: ContractPreviewProps) {
           .contract-content {
             position: relative;
             z-index: 1;
+          }
+          .contract-header-logo {
+            opacity: 0.22 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           body {
             background: white !important;

@@ -13,6 +13,8 @@ import { Textarea } from "@/presentation/components/atoms/Textarea";
 import { FormField } from "@/presentation/components/molecules/FormField";
 import { ClausulaFieldset } from "@/presentation/components/molecules/ClausulaFieldset";
 import { DuplicateRecordModal } from "@/presentation/components/molecules/DuplicateRecordModal";
+import { normalizeCargoClausulas } from "@/lib/clausulaOrdering";
+import { ensureFreshSession, toUserFacingError } from "@/lib/supabase/session";
 
 type CargoFormValues = z.input<typeof cargoSchema>;
 
@@ -33,9 +35,14 @@ const EMPTY_CARGO: CargoFormValues = {
 function toFormValues(input?: CargoInput): CargoFormValues {
   if (!input) return EMPTY_CARGO;
   return {
-    nombre_cargo: input.nombre_cargo,
+    nombre_cargo: input.nombre_cargo ?? "",
     funciones: input.funciones ?? "",
-    clausulas: input.clausulas ?? [],
+    clausulas: (input.clausulas ?? []).map((clausula, index) => ({
+      id: clausula.id,
+      titulo: clausula.titulo ?? "",
+      descripcion: clausula.descripcion ?? "",
+      orden: clausula.orden ?? (index + 1) * 10,
+    })),
   };
 }
 
@@ -60,22 +67,34 @@ export function CargoForm({
     defaultValues: toFormValues(defaultValues),
   });
 
-  const { fields, append, remove } = useFieldArray({ control, name: "clausulas" });
+  // keyName distinto de "id" para no pisar el UUID real de la cláusula en BD.
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "clausulas",
+    keyName: "fieldKey",
+  });
 
   const submit = handleSubmit(async (data) => {
     setSubmitError(null);
     try {
+      await ensureFreshSession();
       const duplicate = await existsCargoNombre(data.nombre_cargo, excludeCargoId);
       if (duplicate) {
         setDuplicateOpen(true);
         return;
       }
-      await onSubmit(data);
+      await onSubmit({
+        ...data,
+        clausulas: normalizeCargoClausulas(data.clausulas).map(({ id, titulo, descripcion, orden }) => ({
+          ...(id && !id.startsWith("tmp-") ? { id } : {}),
+          titulo,
+          descripcion,
+          orden,
+        })),
+      });
       reset(EMPTY_CARGO);
     } catch (err) {
-      setSubmitError(
-        err instanceof Error ? err.message : "No se pudo guardar el cargo. Intenta de nuevo.",
-      );
+      setSubmitError(toUserFacingError(err, "No se pudo guardar el cargo. Intenta de nuevo."));
     }
   });
 
@@ -119,14 +138,23 @@ export function CargoForm({
             <div>
               <h3 className="text-sm font-semibold text-foreground">Cláusulas del cargo</h3>
               <p className="text-xs text-muted-foreground">
-                Estas cláusulas se agregarán al contrato junto con las cláusulas globales.
+                {fields.length > 0
+                  ? `${fields.length} cláusula${fields.length === 1 ? "" : "s"} en este cargo.`
+                  : "Si agregas cláusulas aquí, reemplazan las globales del mismo número (p. ej. CLÁUSULA PRIMERA). Las demás cláusulas globales siguen aplicando."}
               </p>
             </div>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => append({ titulo: "", descripcion: "", orden: fields.length * 10 })}
+              onClick={() =>
+                append({
+                  id: `tmp-${Date.now()}-${fields.length}`,
+                  titulo: "",
+                  descripcion: "",
+                  orden: (fields.length + 1) * 10,
+                })
+              }
               leftIcon={<Plus className="h-4 w-4" aria-hidden />}
             >
               Agregar cláusula
@@ -141,7 +169,7 @@ export function CargoForm({
 
           <div className="space-y-4">
             {fields.map((field, index) => (
-              <div key={field.id} className="rounded-lg border border-border bg-surface p-4">
+              <div key={field.fieldKey} className="rounded-lg border border-border bg-surface p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                     <GripVertical className="h-4 w-4" aria-hidden />

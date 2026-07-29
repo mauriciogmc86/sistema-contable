@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
-import { Briefcase, FileText, Pencil, Plus, Trash2 } from "lucide-react";
+import { Briefcase, Copy, FileText, Pencil, Plus, Trash2 } from "lucide-react";
 import type { CargoInput, ClausulaGlobalInput } from "@/application/validation";
 import {
   listCargos,
@@ -10,6 +10,7 @@ import {
   updateCargo,
   deleteCargo,
   getCargo,
+  getCargoForDuplicate,
   type CargoRecord,
 } from "@/infrastructure/repositories/SupabaseCargoRepository";
 import {
@@ -19,6 +20,8 @@ import {
   deleteClausula,
   type ClausulaRecord,
 } from "@/infrastructure/repositories/SupabaseClausulaRepository";
+import { existsCargoNombre } from "@/infrastructure/repositories/duplicateChecks";
+import { ensureFreshSession } from "@/lib/supabase/session";
 import { Button } from "@/presentation/components/atoms/Button";
 import { Badge } from "@/presentation/components/atoms/Badge";
 import { Card, CardContent } from "@/presentation/components/molecules/Card";
@@ -44,13 +47,41 @@ const ClausulaGlobalForm = dynamic(
 
 type Tab = "cargos" | "globales";
 
+type CargoModalState =
+  | { mode: "new"; formKey: string }
+  | { mode: "edit"; id: number; values: CargoInput; formKey: string }
+  | { mode: "duplicate"; values: CargoInput; formKey: string; usedFallbackClausulas: boolean };
+
+async function nextCargoCopyName(baseName: string): Promise<string> {
+  const base = baseName.trim();
+  let candidate = `${base} (copia)`;
+  let n = 2;
+  while (await existsCargoNombre(candidate)) {
+    candidate = `${base} (copia ${n})`;
+    n += 1;
+  }
+  return candidate;
+}
+
+function buildDuplicatedCargo(values: CargoInput, nombre: string): CargoInput {
+  return {
+    nombre_cargo: nombre,
+    funciones: values.funciones ?? "",
+    clausulas: (values.clausulas ?? []).map((clausula, index) => ({
+      id: `tmp-${Date.now()}-${index}`,
+      titulo: clausula.titulo,
+      descripcion: clausula.descripcion,
+      orden: clausula.orden ?? (index + 1) * 10,
+    })),
+  };
+}
+
 export default function CargosPage() {
   const [tab, setTab] = useState<Tab>("cargos");
 
   // ── Cargos state ────────────────────────────────────────────
   const cargos = useAsync(() => listCargos(), []);
-  const [cargoModalOpen, setCargoModalOpen] = useState(false);
-  const [cargoEdit, setCargoEdit] = useState<{ id: number; values: CargoInput } | null>(null);
+  const [cargoModal, setCargoModal] = useState<CargoModalState | null>(null);
   const [cargoToDelete, setCargoToDelete] = useState<CargoRecord | null>(null);
   const [editLoadingId, setEditLoadingId] = useState<number | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<SaveSuccessKind | null>(null);
@@ -62,29 +93,55 @@ export default function CargosPage() {
   const [clausulaToDelete, setClausulaToDelete] = useState<ClausulaRecord | null>(null);
 
   // ── Cargo handlers ───────────────────────────────────────────
+  const closeCargoModal = () => setCargoModal(null);
+
   const handleSaveCargo = async (data: CargoInput) => {
-    if (cargoEdit) {
-      await updateCargo(cargoEdit.id, data);
+    if (cargoModal?.mode === "edit") {
+      await updateCargo(cargoModal.id, data);
+      setSaveSuccess("cargo-updated");
     } else {
       await createCargo(data);
+      setSaveSuccess("cargo-created");
     }
     cargos.reload();
-    setCargoModalOpen(false);
-    setCargoEdit(null);
-    setSaveSuccess(cargoEdit ? "cargo-updated" : "cargo-created");
+    closeCargoModal();
   };
 
   const openNewCargo = () => {
-    setCargoEdit(null);
-    setCargoModalOpen(true);
+    setCargoModal({ mode: "new", formKey: `new-${Date.now()}` });
   };
 
   const openEditCargo = async (cargo: CargoRecord) => {
     setEditLoadingId(cargo.id);
     try {
+      await ensureFreshSession();
       const values = await getCargo(cargo.id);
-      setCargoEdit({ id: cargo.id, values });
-      setCargoModalOpen(true);
+      setCargoModal({
+        mode: "edit",
+        id: cargo.id,
+        values,
+        formKey: `edit-${cargo.id}-${values.clausulas.length}-${Date.now()}`,
+      });
+    } finally {
+      setEditLoadingId(null);
+    }
+  };
+
+  const openDuplicateCargo = async (cargo: CargoRecord) => {
+    setEditLoadingId(cargo.id);
+    try {
+      await ensureFreshSession();
+      const own = await getCargo(cargo.id);
+      const values = own.clausulas.length > 0 ? own : await getCargoForDuplicate(cargo.id);
+      const usedFallbackClausulas = own.clausulas.length === 0 && values.clausulas.length > 0;
+      const nombre = await nextCargoCopyName(values.nombre_cargo);
+      const draft = buildDuplicatedCargo(values, nombre);
+      setCargoModal({
+        mode: "duplicate",
+        values: draft,
+        usedFallbackClausulas,
+        formKey: `dup-${cargo.id}-${draft.clausulas.length}-${Date.now()}`,
+      });
     } finally {
       setEditLoadingId(null);
     }
@@ -181,6 +238,7 @@ export default function CargosPage() {
                   <thead className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>
                       <th className="py-2 pr-4">Cargo</th>
+                      <th className="py-2 pr-4">Cláusulas</th>
                       <th className="py-2 pr-4">Funciones</th>
                       <th className="py-2 text-right">Acciones</th>
                     </tr>
@@ -189,6 +247,11 @@ export default function CargosPage() {
                     {(cargos.data ?? []).map((c) => (
                       <tr key={c.id}>
                         <td className="py-3 pr-4 font-medium text-foreground">{c.nombre_cargo}</td>
+                        <td className="py-3 pr-4">
+                          <Badge tone={c.clausulas_count ? "neutral" : "warning"}>
+                            {c.clausulas_count ?? 0}
+                          </Badge>
+                        </td>
                         <td className="py-3 pr-4 max-w-xs truncate text-muted-foreground">
                           {c.funciones ? (
                             <span title={c.funciones}>{c.funciones.slice(0, 80)}{c.funciones.length > 80 ? "…" : ""}</span>
@@ -201,7 +264,18 @@ export default function CargosPage() {
                             <Button
                               variant="ghost"
                               size="icon"
+                              aria-label={`Duplicar cargo ${c.nombre_cargo}`}
+                              title="Duplicar"
+                              disabled={editLoadingId === c.id}
+                              onClick={() => openDuplicateCargo(c)}
+                            >
+                              <Copy className="h-4 w-4" aria-hidden />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               aria-label="Editar"
+                              title="Editar"
                               disabled={editLoadingId === c.id}
                               onClick={() => openEditCargo(c)}
                             >
@@ -211,6 +285,7 @@ export default function CargosPage() {
                               variant="ghost"
                               size="icon"
                               aria-label="Eliminar"
+                              title="Eliminar"
                               onClick={() => setCargoToDelete(c)}
                             >
                               <Trash2 className="h-4 w-4 text-danger" aria-hidden />
@@ -321,24 +396,44 @@ export default function CargosPage() {
 
       {/* ── CARGO MODAL ── */}
       <Modal
-        open={cargoModalOpen}
-        onClose={() => { setCargoModalOpen(false); setCargoEdit(null); }}
-        title={cargoEdit ? "Editar cargo" : "Nuevo cargo"}
+        open={cargoModal !== null}
+        onClose={closeCargoModal}
+        title={
+          cargoModal?.mode === "edit"
+            ? "Editar cargo"
+            : cargoModal?.mode === "duplicate"
+              ? "Duplicar cargo"
+              : "Nuevo cargo"
+        }
         description={
-          cargoEdit
+          cargoModal?.mode === "edit"
             ? "Actualiza el nombre, funciones y cláusulas de este cargo."
-            : "Define el nombre del cargo, sus funciones generales y las cláusulas específicas que aplican en el contrato."
+            : cargoModal?.mode === "duplicate"
+              ? cargoModal.usedFallbackClausulas
+                ? `Se copiaron ${cargoModal.values.clausulas.length} cláusula(s) del contrato (globales + cargo). Ajusta el nombre y guarda la copia.`
+                : `Se copiaron ${cargoModal.values.clausulas.length} cláusula(s) del cargo original. Cambia el nombre y ajusta lo que necesites antes de guardar.`
+              : "Define el nombre del cargo, sus funciones generales y las cláusulas específicas que aplican en el contrato."
         }
         size="lg"
       >
-        <CargoForm
-          key={cargoEdit?.id ?? "new-cargo"}
-          defaultValues={cargoEdit?.values}
-          excludeCargoId={cargoEdit?.id}
-          submitLabel={cargoEdit ? "Guardar cambios" : "Registrar cargo"}
-          onSubmit={handleSaveCargo}
-          onCancel={() => { setCargoModalOpen(false); setCargoEdit(null); }}
-        />
+        {cargoModal && (
+          <CargoForm
+            key={cargoModal.formKey}
+            defaultValues={
+              cargoModal.mode === "new" ? undefined : cargoModal.values
+            }
+            excludeCargoId={cargoModal.mode === "edit" ? cargoModal.id : undefined}
+            submitLabel={
+              cargoModal.mode === "edit"
+                ? "Guardar cambios"
+                : cargoModal.mode === "duplicate"
+                  ? "Guardar copia"
+                  : "Registrar cargo"
+            }
+            onSubmit={handleSaveCargo}
+            onCancel={closeCargoModal}
+          />
+        )}
       </Modal>
 
       {/* ── CLAUSULA GLOBAL MODAL ── */}

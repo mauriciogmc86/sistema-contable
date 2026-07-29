@@ -1,10 +1,13 @@
 import { supabase } from "@/lib/supabase";
 import type { CargoInput, ClausulaItemInput } from "@/application/validation";
+import { normalizeCargoClausulas } from "@/lib/clausulaOrdering";
+import { getClausulasForCargo } from "@/infrastructure/repositories/SupabaseClausulaRepository";
 
 export interface CargoRecord {
   id: number;
   nombre_cargo: string;
   funciones: string;
+  clausulas_count?: number;
 }
 
 export interface ClausulaRecord {
@@ -21,12 +24,54 @@ export interface CargoWithClausulas extends CargoRecord {
 }
 
 export async function listCargos(): Promise<CargoRecord[]> {
-  const { data, error } = await supabase
-    .from("cargos")
-    .select("id, nombre_cargo, funciones")
-    .order("nombre_cargo", { ascending: true });
+  const [{ data: cargos, error }, { data: clausulaRows, error: clError }] = await Promise.all([
+    supabase.from("cargos").select("id, nombre_cargo, funciones").order("nombre_cargo", { ascending: true }),
+    supabase.from("clausulas").select("cargo_id").not("cargo_id", "is", null),
+  ]);
+
   if (error) throw new Error(error.message);
-  return (data as CargoRecord[]) ?? [];
+  if (clError) throw new Error(clError.message);
+
+  const counts = new Map<number, number>();
+  for (const row of clausulaRows ?? []) {
+    if (row.cargo_id == null) continue;
+    const id = Number(row.cargo_id);
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+
+  return ((cargos as CargoRecord[]) ?? []).map((cargo) => ({
+    ...cargo,
+    clausulas_count: counts.get(cargo.id) ?? 0,
+  }));
+}
+
+function mapClausulasForForm(
+  clausulas: Array<{ id?: string; titulo: string; descripcion: string; orden: number }>,
+): CargoInput["clausulas"] {
+  return normalizeCargoClausulas(
+    clausulas.map((clausula, index) => ({
+      id: clausula.id,
+      titulo: clausula.titulo,
+      descripcion: clausula.descripcion,
+      orden: clausula.orden ?? (index + 1) * 10,
+    })),
+  ).map(({ id, titulo, descripcion, orden }) => ({
+    ...(id ? { id } : {}),
+    titulo,
+    descripcion,
+    orden,
+  }));
+}
+
+async function fetchClausulasByCargoId(cargoId: number) {
+  const { data, error } = await supabase
+    .from("clausulas")
+    .select("id, titulo, descripcion, orden, es_global, cargo_id")
+    .eq("cargo_id", cargoId)
+    .order("orden", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).filter((row) => row.es_global !== true);
 }
 
 export async function getCargo(id: number): Promise<CargoInput> {
@@ -37,23 +82,29 @@ export async function getCargo(id: number): Promise<CargoInput> {
     .single();
   if (cargoError) throw new Error(cargoError.message);
 
-  const { data: clausulas, error: clError } = await supabase
-    .from("clausulas")
-    .select("id, titulo, descripcion, orden")
-    .eq("cargo_id", id)
-    .eq("es_global", false)
-    .order("orden", { ascending: true });
-  if (clError) throw new Error(clError.message);
+  const rows = await fetchClausulasByCargoId(id);
 
   return {
     nombre_cargo: cargo.nombre_cargo ?? "",
     funciones: cargo.funciones ?? "",
-    clausulas: (clausulas ?? []).map((c) => ({
-      id: c.id,
-      titulo: c.titulo,
-      descripcion: c.descripcion,
-      orden: c.orden,
-    })),
+    clausulas: mapClausulasForForm(rows),
+  };
+}
+
+/** Carga un cargo para duplicar: cláusulas propias o, si no hay, las efectivas del contrato. */
+export async function getCargoForDuplicate(id: number): Promise<CargoInput> {
+  const base = await getCargo(id);
+
+  if (base.clausulas.length > 0) {
+    return base;
+  }
+
+  const effective = await getClausulasForCargo(id);
+  return {
+    ...base,
+    clausulas: mapClausulasForForm(
+      effective.map(({ titulo, descripcion, orden }) => ({ titulo, descripcion, orden })),
+    ),
   };
 }
 
@@ -91,14 +142,13 @@ async function syncClausulasForCargo(cargoId: number, clausulas: ClausulaItemInp
   const { data: existing, error: fetchError } = await supabase
     .from("clausulas")
     .select("id")
-    .eq("cargo_id", cargoId)
-    .eq("es_global", false);
+    .eq("cargo_id", cargoId);
   if (fetchError) throw new Error(fetchError.message);
 
   const existingIds = new Set((existing ?? []).map((c) => c.id));
-  const incomingWithId = clausulas.filter((c) => c.id && existingIds.has(c.id));
-  const incomingNew = clausulas.filter((c) => !c.id || !existingIds.has(c.id));
-  const incomingIds = new Set(incomingWithId.map((c) => c.id!));
+  const incomingIds = new Set(
+    clausulas.map((c) => c.id).filter((id): id is string => !!id && existingIds.has(id)),
+  );
   const toDelete = [...existingIds].filter((id) => !incomingIds.has(id));
 
   if (toDelete.length > 0) {
@@ -106,24 +156,29 @@ async function syncClausulasForCargo(cargoId: number, clausulas: ClausulaItemInp
     if (error) throw new Error(error.message);
   }
 
-  for (const c of incomingWithId) {
-    const { error } = await supabase
-      .from("clausulas")
-      .update({ titulo: c.titulo, descripcion: c.descripcion, orden: c.orden ?? 0 })
-      .eq("id", c.id!);
-    if (error) throw new Error(error.message);
-  }
+  const normalized = normalizeCargoClausulas(clausulas);
 
-  if (incomingNew.length > 0) {
-    const { error } = await supabase.from("clausulas").insert(
-      incomingNew.map((c, i) => ({
-        titulo: c.titulo,
-        descripcion: c.descripcion,
-        orden: c.orden ?? i,
-        cargo_id: cargoId,
-        es_global: false,
-      })),
-    );
+  for (const clausula of normalized) {
+    const payload = {
+      titulo: clausula.titulo,
+      descripcion: clausula.descripcion,
+      orden: clausula.orden,
+    };
+
+    if (clausula.id && existingIds.has(clausula.id)) {
+      const { error } = await supabase
+        .from("clausulas")
+        .update(payload)
+        .eq("id", clausula.id);
+      if (error) throw new Error(error.message);
+      continue;
+    }
+
+    const { error } = await supabase.from("clausulas").insert({
+      ...payload,
+      cargo_id: cargoId,
+      es_global: false,
+    });
     if (error) throw new Error(error.message);
   }
 }
